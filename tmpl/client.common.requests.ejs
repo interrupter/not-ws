@@ -1,0 +1,73 @@
+
+	//Запуск таймера проверки запросов.
+	startReqChckTimer() {
+		clearTimeout(this.reqChkTimer);
+		this.reqChkTimer = setTimeout(this.checkRequests.bind(this), this.reqChkStep);
+	}
+
+	stopReqChckTimer() {
+		clearTimeout(this.reqChkTimer);
+	}
+
+	//Поиск запроса по uuid
+	findRequest(id) {
+		for (let i = 0; i < this.requests.length; i++) {
+			if (this.requests[i].id === id) {
+				return i;
+			}
+		}
+		return false;
+	}
+
+	extortRequest(id){
+		let reqIndex = this.findRequest(id);
+		if(reqIndex === false) {
+			this.logMsg(`failed to find request for response ${id}`);
+			return;
+		}
+		let request = this.requests[reqIndex];
+		//Удаление элемента из списка запросов.
+		this.requests.splice(reqIndex, 1);
+		//Выполнение callback'а запроса.
+		if(LOG.isFunc(request.cb)) {
+			return request;
+		} else {
+			return null;
+		}
+	}
+
+	addRequest(id, callback) {
+		this.requests.push({
+			id, //Идентификатор запроса.
+			time: Date.now(), //Время отправки запроса.
+			cb: callback //callback для обработки результатов запроса.
+		});
+	}
+
+	//Проверка списка запросов.
+	checkRequests() {
+		//Формирование списка запросов для удаления по таймауту.
+		let list = [];
+		let now = Date.now();
+		this.requests.forEach((req) => {
+			let reqAge = now - req.time;
+			if (reqAge > this.reqTimeout) {
+				list.push(req.id);
+			}
+		});
+		//Удаление запросов по таймауту.
+		list.forEach((reqId) => {
+			let reqIndex = this.findRequest(reqId);
+			if (reqIndex === false) {
+				this.logMsg(`timeout check:failed to find request for response ${reqId}`);
+				return;
+			}
+			let request = this.requests[reqIndex];
+			if (LOG.isFunc(request.cb)) {
+				request.cb(CONST.ERR_MSG.REQUEST_TIMEOUT);
+			} else {
+				this.logMsg(`timeout check:Не задан callback для запроса с id: ${reqId}`);
+			}
+			this.requests.splice(reqIndex, 1);
+		});
+	}

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <script src="../../node_modules/validator/validator.min.js"></script>
+  <script src="../../node_modules/wolfy87-eventemitter/EventEmitter.min.js"></script>
+  <script src="../../build/client.min.js"></script>
+
+</head>
+
+<body>
+  <script>
+    const client = new notWSClient({
+      options: {
+        host: 'localhost',
+        port: 12000,
+        path: '',
+        secure: false,
+        ping: true
+      }
+    });
+    client.once('ready', ()=>{
+      client.send('test', 'sayHello', {test: true});
+    });
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <script src="./validator.min.js"></script>
+  <script src="./EventEmitter.min.js"></script>
+  <script src="./client.js"></script>
+
+</head>
+
+<body>
+  <script>
+    function getJSON(response) {
+      if (response.json) {
+        return response.json();
+      } else {
+        throw new TypeError("Oops, we haven't got JSON!");
+      }
+    }
+    const client = new notWSClient({
+      options: {
+        host: 'localhost',
+        port: 12000,
+        path: '',
+        secure: true,
+        ping: true,
+        getToken() {
+          var headers = new Headers();
+          headers.append('pragma', 'no-cache');
+          headers.append('cache-control', 'no-cache');
+          return fetch('http://localhost:13000/api/token', {method: 'GET', headers}).then(getJSON).then((json) => {
+            console.log('token', json.token);
+            return json.token;
+          });
+        }
+      }
+    });
+    //when
+    client.once('ready', () => {
+      //sending test message, with credetials
+      client.send('test', 'sayHello', {
+        test: true
+      });
+      client.on('tokenUpdated', (token)=>{
+        console.info('token updated', token);
+      })
+      //now send with experied credentials
+      setTimeout(
+        () => {
+          setInterval(()=>{
+            client.send('test', 'sayHello', {
+              test: true
+            });
+          }, 20000);
+        }, 1000);
+    });
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,94 @@
+{
+  "name": "not-ws",
+  "version": "0.0.1",
+  "description": "not-* family module for WebSocket communication",
+  "main": "index.js",
+  "scripts": {
+    "build": "./bin/build.sh",
+    "buildtest": "./bin/build.sh",
+    "prelint": "npm run buildtest",
+    "pretest": "npm run lint",
+    "test": "./node_modules/.bin/mocha --reporter spec",
+    "lint": "./node_modules/.bin/eslint ./src/**/** --fix",
+    "docs": "./node_modules/.bin/jsdoc -c jsdoc.json",
+    "cover": "nyc npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/interrupter/not-ws.git"
+  },
+  "keywords": [
+    "not-framework",
+    "not-node",
+    "not-ws",
+    "websocket"
+  ],
+  "author": "interrupter <alex.repin@mail.ru> (http://github.com/interrupter)",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/interrupter/not-ws/issues"
+  },
+  "homepage": "https://github.com/interrupter/not-ws#readme",
+  "dependencies": {
+    "jsonwebtoken": "^8.5.1",
+    "node-fetch": "^2.6.0",
+    "url": "^0.11.0",
+    "uuid": "*",
+    "validator": "^11.1.0",
+    "wolfy87-eventemitter": "^5.2.8",
+    "ws": "^7.2.0"
+  },
+  "devDependencies": {
+    "ejs": "*",
+    "express": "*",
+    "rollup": "*",
+    "rollup-plugin-terser": "*",
+    "rollup-plugin-babel": "*",
+    "rollup-plugin-eslint": "*",
+    "rollup-plugin-filesize": "*",
+    "@babel/core": "*",
+    "babel-env": "*",
+    "babel-polyfill": "*",
+    "chai": "*",
+    "eslint": "*",
+    "ink-docstrap": "*",
+    "jsdoc": "*",
+    "mocha": "*",
+    "nyc": "*"
+  },
+  "nyc": {
+    "include": [
+      "src/**/**/**.js"
+    ],
+    "exclude": [
+      "tests/**/**/**/**.js"
+    ],
+    "reporter": [
+      "html"
+    ],
+    "check-coverage": false,
+    "per-file": true,
+    "lines": 99,
+    "statements": 99,
+    "functions": 99,
+    "branches": 99,
+    "watermarks": {
+      "lines": [
+        80,
+        95
+      ],
+      "functions": [
+        80,
+        95
+      ],
+      "branches": [
+        80,
+        95
+      ],
+      "statements": [
+        80,
+        95
+      ]
+    }
+  }
+}
