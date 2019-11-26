@@ -1,6 +1,6 @@
 {
   "name": "not-ws",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "not-* family module for WebSocket communication",
   "main": "index.js",
   "scripts": {
@@ -34,7 +34,7 @@
     "node-fetch": "^2.6.0",
     "url": "^0.11.0",
     "uuid": "*",
-    "validator": "^11.1.0",
+    "validator": "^12.1.0",
     "wolfy87-eventemitter": "^5.2.8",
     "ws": "^7.2.0"
   },
