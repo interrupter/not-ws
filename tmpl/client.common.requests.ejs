@@ -23,7 +23,7 @@
 		let reqIndex = this.findRequest(id);
 		if(reqIndex === false) {
 			this.logMsg(`failed to find request for response ${id}`);
-			return;
+			return null;
 		}
 		let request = this.requests[reqIndex];
 		//Удаление элемента из списка запросов.

@@ -74,7 +74,7 @@ class notWSClient extends EventEmitter{
 
 	//Получение токена.
 	//Возможно реализовать разными способами, поэтому выделено в отдельный метод.
-	getToken(){		
+	getToken(){
 		if(LOG.isFunc(this.options.getToken)){
 			return this.options.getToken();
 		}else{
@@ -127,7 +127,7 @@ class notWSClient extends EventEmitter{
 		let reqIndex = this.findRequest(id);
 		if(reqIndex === false) {
 			this.logMsg(`failed to find request for response ${id}`);
-			return;
+			return null;
 		}
 		let request = this.requests[reqIndex];
 		//Удаление элемента из списка запросов.
@@ -194,9 +194,23 @@ class notWSClient extends EventEmitter{
 			}
 			this.messenger.validate(data);
 			let msg = this.messenger.unpack(data);
-			this.router.route(msg.service, msg.payload, this.ws)
-				.then(this.respond.bind(this))
-				.catch(this.logError.bind(this));
+			if(msg.service.type === CONST.MSG_TYPE.RESPONSE){
+				let request = this.extortRequest(msg.service.id);
+				if(request !== null){
+					request.cb(msg);
+				}
+			}else if(msg.service.type === CONST.MSG_TYPE.EVENT){
+				this.emit('remote.' + msg.service.name, msg.service, msg.payload, this.ws);
+			}else{
+				this.router.route(msg.service, msg.payload, this.ws)
+					.then((responseData)=>{
+						this.respond(responseData, {id: msg.service.id, type: CONST.MSG_TYPE.RESPONSE, name: msg.service.name});
+					})
+					.catch((e)=>{
+						this.logError(e);
+						this.respond({}, {id: msg.service.id, type: CONST.MSG_TYPE.RESPONSE, name: msg.service.name}, e);
+					});
+			}
 		}catch(e){
 			this.logError(e);
 		}

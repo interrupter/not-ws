@@ -33,6 +33,15 @@
             console.log('token', json.token);
             return json.token;
           });
+        },
+        messenger:{
+          secure: false,
+          types: {
+            'test': ['sayHello'],
+            '__service': ['updateToken'],
+            'response': ['myName'],
+            'request': ['myName']
+          },
         }
       }
     });
@@ -54,6 +63,19 @@
             });
           }, 20000);
         }, 1000);
+        //now send with experied credentials
+        setTimeout(
+          () => {
+            setInterval(()=>{
+              let msgToSenf = { a: Math.ceil(Math.random()*10), b: Math.ceil(Math.random()*10)};
+              client.sendRequest('myName', msgToSenf)
+                .then((msg)=>{
+                  console.log('response on request myName');
+                  console.log(`${msgToSenf.a} + ${msgToSenf.b} = ${msg.payload.c}`);
+                })
+                .catch(console.error);
+            }, 30000);
+          }, 4000);
     });
   </script>
 </body>

@@ -98,9 +98,23 @@ class notWSServerClient extends EventEmitter {
 			this.messenger.validate(data);
 			let msg = this.messenger.unpack(data);
 			this.emit('message', msg);
-			this.router.route(msg.service, msg.payload, this.ws)
-				.then(this.respond.bind(this))
-				.catch(this.logError.bind(this));
+			if(msg.service.type === CONST.MSG_TYPE.RESPONSE){
+				let callback = this.extortRequest(msg.service.id);
+				if(callback !== null){
+					callback(msg);
+				}
+			}else if(msg.service.type === CONST.MSG_TYPE.EVENT){
+				this.emit('remote.' + msg.service.name, msg.service, msg.payload, this.ws);
+			}else{
+				this.router.route(msg.service, msg.payload, this.ws)
+					.then((responseData)=>{
+						this.respond(responseData, {id: msg.service.id, type: CONST.MSG_TYPE.RESPONSE, name: msg.service.name});
+					})
+					.catch((e)=>{
+						this.logError(e);
+						this.respond({}, {id: msg.service.id}, e);
+					});
+			}
 		}catch(e){
 			this.logError(e);
 			if(e.message === CONST.ERR_MSG.MSG_CREDENTIALS_IS_NOT_VALID){

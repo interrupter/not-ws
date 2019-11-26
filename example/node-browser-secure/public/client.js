@@ -674,7 +674,7 @@ var notWSClient = (function () {
 	    this.errConnMsg = null; //Идентификатор сообщения об ошибке подключения к вебсокет серверу.
 
 	    this.firstConn = true;
-	    this.messenger = messenger ? messenger : new notWSMessage();
+	    this.messenger = messenger ? messenger : new notWSMessage(options.messenger ? options.messenger : {});
 	    this.router = router ? router : new notWSRouter();
 	    this.router.on('updateToken', this.renewToken.bind(this));
 	    this.jwtToken = null; //Токен авторизации.
@@ -782,7 +782,7 @@ var notWSClient = (function () {
 
 	    if (reqIndex === false) {
 	      this.logMsg(`failed to find request for response ${id}`);
-	      return;
+	      return null;
 	    }
 
 	    let request = this.requests[reqIndex]; //Удаление элемента из списка запросов.
@@ -859,7 +859,31 @@ var notWSClient = (function () {
 
 	      this.messenger.validate(data);
 	      let msg = this.messenger.unpack(data);
-	      this.router.route(msg.service, msg.payload, this.ws).then(this.respond.bind(this)).catch(this.logError.bind(this));
+
+	      if (msg.service.type === CONST.MSG_TYPE.RESPONSE) {
+	        let request = this.extortRequest(msg.service.id);
+
+	        if (request !== null) {
+	          request.cb(msg);
+	        }
+	      } else if (msg.service.type === CONST.MSG_TYPE.EVENT) {
+	        this.emit('remote.' + msg.service.name, msg.service, msg.payload, this.ws);
+	      } else {
+	        this.router.route(msg.service, msg.payload, this.ws).then(responseData => {
+	          this.respond(responseData, {
+	            id: msg.service.id,
+	            type: CONST.MSG_TYPE.RESPONSE,
+	            name: msg.service.name
+	          });
+	        }).catch(e => {
+	          this.logError(e);
+	          this.respond({}, {
+	            id: msg.service.id,
+	            type: CONST.MSG_TYPE.RESPONSE,
+	            name: msg.service.name
+	          }, e);
+	        });
+	      }
 	    } catch (e) {
 	      this.logError(e);
 	    }
