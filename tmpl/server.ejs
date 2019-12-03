@@ -230,7 +230,7 @@ class notWSServer extends EventEmitter{
   informClientAboutExperiedToken(conn, req){
     return new Promise((res, rej)=>{
     try{
-      let msg ={type:'__service', name: 'updateToken'};
+      let msg = {type:'__service', name: 'updateToken'};
       conn.send(JSON.stringify(this.getMessengerForClient(conn, req).pack({}, msg)),
         (e)=>{
           if(e){rej(e);}
@@ -241,7 +241,23 @@ class notWSServer extends EventEmitter{
       rej(e);
     }
     });
+  }
 
+  /**
+  * Broadcasting message to clients
+  */
+  broadcast(type, name, payload, secure = true, connFilter = undefined){
+    this.getClients(connFilter).forEach((client)=>{
+      client.send(type, name, payload, secure);
+    });
+  }
+
+  getClients(filter){
+    if(LOG.isFunc(filter)){
+      return this.wsClients.filter(filter);
+    }else{
+      return this.wsClients;
+    }
   }
 
 }
