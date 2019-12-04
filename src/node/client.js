@@ -28,6 +28,7 @@ class notWSClient extends EventEmitter{
 		let logger = options.logger;
 		//Основные параметры
 		this.options = options; //Параметры клиентского подключения
+		this.__name = options.name;
 		//Подключение к WS service TMA
 		this.ws         	= null; //Подключение к websocket серверу.
 		this.connCount    = 0;    //Количество неудачных попыток подключения к websocket серверу.
@@ -102,7 +103,7 @@ class notWSClient extends EventEmitter{
 	}
 
 	//набор методов для работы с запросами и выявления безответных
-	
+
 	//Запуск таймера проверки запросов.
 	startReqChckTimer() {
 		clearTimeout(this.reqChkTimer);
@@ -452,5 +453,3 @@ class notWSClient extends EventEmitter{
 }
 
 module.exports = notWSClient;
-
-
