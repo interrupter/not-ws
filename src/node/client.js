@@ -28,15 +28,15 @@ class notWSClient extends EventEmitter{
 		let logger = options.logger;
 		//Основные параметры
 		this.options = options; //Параметры клиентского подключения
-		this.__name = options.name;
+		this.__name = options.name?options.name:'WSClient';
 		//Подключение к WS service TMA
 		this.ws         	= null; //Подключение к websocket серверу.
 		this.connCount    = 0;    //Количество неудачных попыток подключения к websocket серверу.
 		this.connCountMax = 10;   //Количество попыток по превышении которого считаем что соединение с серверов разорвано.
 		this.errConnMsg   = null; //Идентификатор сообщения об ошибке подключения к вебсокет серверу.
 		this.firstConn    = true;
-		this.messenger		= messenger?messenger: new notWSMessenger();
-		this.router				= router?router: new notWSRouter();
+		this.messenger		= messenger?messenger: new notWSMessenger(options.messenger?options.messenger:{});
+		this.router				= router?router: new notWSRouter(options.router?options.router:{});
 		this.router.on('updateToken', this.renewToken.bind(this));
 		this.jwtToken     = null; //Токен авторизации.
 		this.jwtExpire    = null; //Время до истечения токена.
@@ -103,7 +103,7 @@ class notWSClient extends EventEmitter{
 	}
 
 	//набор методов для работы с запросами и выявления безответных
-
+	
 	//Запуск таймера проверки запросов.
 	startReqChckTimer() {
 		clearTimeout(this.reqChkTimer);
@@ -453,3 +453,5 @@ class notWSClient extends EventEmitter{
 }
 
 module.exports = notWSClient;
+
+

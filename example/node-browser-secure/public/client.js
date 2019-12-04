@@ -663,7 +663,8 @@ var notWSClient = (function () {
 	    let logger = options.logger; //Основные параметры
 
 	    this.options = options; //Параметры клиентского подключения
-	    //Подключение к WS service TMA
+
+	    this.__name = options.name ? options.name : 'WSClient'; //Подключение к WS service TMA
 
 	    this.ws = null; //Подключение к websocket серверу.
 
@@ -675,7 +676,7 @@ var notWSClient = (function () {
 
 	    this.firstConn = true;
 	    this.messenger = messenger ? messenger : new notWSMessage(options.messenger ? options.messenger : {});
-	    this.router = router ? router : new notWSRouter();
+	    this.router = router ? router : new notWSRouter(options.router ? options.router : {});
 	    this.router.on('updateToken', this.renewToken.bind(this));
 	    this.jwtToken = null; //Токен авторизации.
 

@@ -1,6 +1,6 @@
 {
   "name": "not-ws",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "not-* family module for WebSocket communication",
   "main": "index.js",
   "scripts": {
