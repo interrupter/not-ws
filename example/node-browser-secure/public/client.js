@@ -854,8 +854,8 @@ var notWSClient = (function () {
 
 	  onMessage(msgEv) {
 	    try {
-	      this.logDebug(msgEv); //проверяем не "понг" ли это, если так - выходим
-
+	      //this.logDebug(msgEv);
+	      //проверяем не "понг" ли это, если так - выходим
 	      if (this.checkPingMsg(msgEv)) {
 	        return;
 	      }
@@ -869,6 +869,7 @@ var notWSClient = (function () {
 
 	      this.messenger.validate(data);
 	      let msg = this.messenger.unpack(data);
+	      this.emit('message', msg);
 
 	      if (msg.service.type === CONST.MSG_TYPE.RESPONSE) {
 	        let request = this.fullfillRequest(msg.service.id);
@@ -1111,7 +1112,10 @@ var notWSClient = (function () {
 	  }
 
 	  sendMessage(type, name, payload) {
-	    this.logDebug('message', type, name, payload);
+	    if (payload !== 'pong' && payload !== 'ping') {
+	      this.logMsg('outgoing message', type, name);
+	    }
+
 	    let message = this.messenger.pack(payload, {
 	      type,
 	      timeOffset: this.timeOffset,
@@ -1122,7 +1126,7 @@ var notWSClient = (function () {
 
 
 	  sendRequest(name, payload) {
-	    this.logDebug('request', name, payload);
+	    this.logMsg('outgoing request', name);
 	    return new Promise((res, rej) => {
 	      try {
 	        //Формирование данных запроса.

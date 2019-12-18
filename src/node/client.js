@@ -182,7 +182,7 @@ class notWSClient extends EventEmitter{
 	//msg - это messageEvent пришедший по WS, соответственно данные лежат в msg.data.
 	onMessage(rawMsg){
 		try{
-			this.logDebug(rawMsg);
+			//this.logDebug(rawMsg);
 			//проверяем не "понг" ли это, если так - выходим
 			if(this.checkPingMsg(rawMsg)){
 				return;
@@ -195,6 +195,7 @@ class notWSClient extends EventEmitter{
 			}
 			this.messenger.validate(data);
 			let msg = this.messenger.unpack(data);
+			this.emit('message', msg);
 			if(msg.service.type === CONST.MSG_TYPE.RESPONSE){
 				let request = this.fullfillRequest(msg.service.id);
 				if(request !== null){
@@ -420,7 +421,9 @@ class notWSClient extends EventEmitter{
 	}
 
 	sendMessage(type, name, payload){
-		this.logDebug('message',type, name, payload);
+		if((payload!== 'pong') &&( payload!== 'ping')){
+			this.logMsg('outgoing message', type, name);
+		}
 		let message = this.messenger.pack(payload, {
 			type,
 			timeOffset: this.timeOffset,
@@ -431,7 +434,7 @@ class notWSClient extends EventEmitter{
 
 	//Отправка запроса на сервер.
 	sendRequest(name, payload){
-		this.logDebug('request', name, payload);
+		this.logMsg('outgoing request', name);
 		return new Promise((res, rej)=>{
 			try{
 				//Формирование данных запроса.
