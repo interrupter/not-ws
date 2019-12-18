@@ -635,11 +635,20 @@ var notWSClient = (function () {
 	    }
 
 	    if (!this.validateType(this.getType(msg))) {
-	      throw new Error(CONST.ERR_MSG.MSG_TYPE_IS_NOT_VALID);
+	      let err = new Error(CONST.ERR_MSG.MSG_TYPE_IS_NOT_VALID);
+	      err.details = {
+	        type: this.getType(msg)
+	      };
+	      throw err;
 	    }
 
 	    if (!this.validateTypeAndName(this.getType(msg), this.getName(msg))) {
-	      throw new Error(CONST.ERR_MSG.MSG_NAME_IS_NOT_VALID);
+	      let err = new Error(CONST.ERR_MSG.MSG_NAME_IS_NOT_VALID);
+	      err.details = {
+	        type: this.getType(msg),
+	        name: this.getName(msg)
+	      };
+	      throw err;
 	    }
 
 	    return msg;
@@ -778,7 +787,7 @@ var notWSClient = (function () {
 	    return false;
 	  }
 
-	  extortRequest(id) {
+	  fullfillRequest(id) {
 	    let reqIndex = this.findRequest(id);
 
 	    if (reqIndex === false) {
@@ -862,7 +871,7 @@ var notWSClient = (function () {
 	      let msg = this.messenger.unpack(data);
 
 	      if (msg.service.type === CONST.MSG_TYPE.RESPONSE) {
-	        let request = this.extortRequest(msg.service.id);
+	        let request = this.fullfillRequest(msg.service.id);
 
 	        if (request !== null) {
 	          request.cb(msg);
@@ -1014,8 +1023,7 @@ var notWSClient = (function () {
 	  }
 
 	  sendPing() {
-	    this.logDebug('out ping', this.isAlive);
-
+	    //this.logDebug('out ping', this.isAlive);
 	    if (this.isAlive === false) {
 	      this.logMsg('Connection is not alive (no pong). Terminating');
 	      this.disconnect();
@@ -1029,7 +1037,7 @@ var notWSClient = (function () {
 
 	  checkPingMsg(msgEv) {
 	    if (msgEv.data === 'pong') {
-	      this.logDebug('in pong');
+	      //this.logDebug('in pong');
 	      this.isAlive = true;
 	      return true;
 	    }

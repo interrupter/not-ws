@@ -213,13 +213,13 @@ class notWSServer extends EventEmitter{
 	}
 
 	pingAll(){
-		this.logDebug('Ping all clients');
+		//this.logDebug('Ping all clients');
 		this.wsClients.forEach(this.pingOne.bind(this));
     this.findAndRemoveDeadClients();
 	}
 
 	pingOne(client){
-		this.logDebug(`ping client`, client.ip);
+		//this.logDebug(`ping client`, client.ip);
 		if (client.isAlive === false){
 			return client.terminate();
 		}

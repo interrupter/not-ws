@@ -85,7 +85,7 @@ class notWSServerClient extends EventEmitter {
 		try{
 			//проверяем не "понг" ли это, если так - выходим
 			if(message === 'ping'){
-				this.logDebug('in ping');
+				//this.logDebug('in ping');
 				this.ws.send('pong');
 				return;
 			}
@@ -99,7 +99,7 @@ class notWSServerClient extends EventEmitter {
 			let msg = this.messenger.unpack(data);
 			this.emit('message', msg);
 			if(msg.service.type === CONST.MSG_TYPE.RESPONSE){
-				let request = this.extortRequest(msg.service.id);
+				let request = this.fullfillRequest(msg.service.id);
 				if(request !== null){
 					request.cb(msg);
 				}
@@ -119,8 +119,6 @@ class notWSServerClient extends EventEmitter {
 			this.logError(e);
 			if(e.message === CONST.ERR_MSG.MSG_CREDENTIALS_IS_NOT_VALID){
 				this.informClientAboutExperiedToken();
-			}else{
-				this.logMsg('token is ok');
 			}
 		}
 	}
@@ -129,7 +127,7 @@ class notWSServerClient extends EventEmitter {
 	*	Proxy for WebSocket event
 	*/
 	onWSPong(){
-		this.logDebug('in pong');
+		//this.logDebug('in pong');
 		this.emit('pong');
 	}
 
@@ -590,7 +588,7 @@ AUTHORIZING: 4
 
 	ping(){
 		if(this.ws){
-			this.logDebug('out ping');
+			//this.logDebug('out ping');
 			this.ws.ping(CONST.noop);
 		}
 	}

@@ -19,7 +19,7 @@
 		return false;
 	}
 
-	extortRequest(id){
+	fullfillRequest(id){
 		let reqIndex = this.findRequest(id);
 		if(reqIndex === false) {
 			this.logMsg(`failed to find request for response ${id}`);

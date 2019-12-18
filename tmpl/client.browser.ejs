@@ -106,7 +106,7 @@ class notWSClient extends EventEmitter{
 			this.messenger.validate(data);
 			let msg = this.messenger.unpack(data);
 			if(msg.service.type === CONST.MSG_TYPE.RESPONSE){
-				let request = this.extortRequest(msg.service.id);
+				let request = this.fullfillRequest(msg.service.id);
 				if(request !== null){
 					request.cb(msg);
 				}
@@ -246,7 +246,7 @@ class notWSClient extends EventEmitter{
 	}
 
 	sendPing(){
-		this.logDebug('out ping', this.isAlive);
+		//this.logDebug('out ping', this.isAlive);
 		if(this.isAlive === false){
 			this.logMsg('Connection is not alive (no pong). Terminating');
 			this.disconnect();
@@ -259,7 +259,7 @@ class notWSClient extends EventEmitter{
 
 	checkPingMsg(msgEv){
 		if (msgEv.data === 'pong'){
-			this.logDebug('in pong');
+			//this.logDebug('in pong');
 			this.isAlive = true;
 			return true;
 		}

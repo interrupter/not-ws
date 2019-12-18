@@ -40,14 +40,14 @@ class notWSServerClient extends EventEmitter {
 		this.__name = (this.options && Object.prototype.hasOwnProperty.call(this.options, 'name')) ? this.options.name : CONST.DEFAULT_CLIENT_NAME;
 		//common constructor part for client browser client, node client, node server client
 		//logging
-		this.logMsg = logger?logger.log:LOG.genLogMsg(this.__name);
-		this.logDebug = logger?logger.debug:LOG.genLogDebug(this.__name);
-		this.logError = logger?logger.error:LOG.genLogError(this.__name);
-		//requests processing
-		this.requests = []; //Список текущих запросов к API.
-		this.reqTimeout = 15000; //Таймаут для выполнения запросов.
-		this.reqChkTimer = null; //Таймер для проверки таймаутов выполнения запросов.
-		this.reqChkStep = 2000; //Таймер для проверки таймаутов выполнения запросов.
+this.logMsg = logger?logger.log:LOG.genLogMsg(this.__name);
+this.logDebug = logger?logger.debug:LOG.genLogDebug(this.__name);
+this.logError = logger?logger.error:LOG.genLogError(this.__name);
+//requests processing
+this.requests = []; //Список текущих запросов к API.
+this.reqTimeout = 15000; //Таймаут для выполнения запросов.
+this.reqChkTimer = null; //Таймер для проверки таймаутов выполнения запросов.
+this.reqChkStep = 2000; //Таймер для проверки таймаутов выполнения запросов.
 
 		//if was terminated
 		this.isTerminated = false;
@@ -94,7 +94,7 @@ class notWSServerClient extends EventEmitter {
 		try{
 			//проверяем не "понг" ли это, если так - выходим
 			if(message === 'ping'){
-				this.logDebug('in ping');
+				//this.logDebug('in ping');
 				this.ws.send('pong');
 				return;
 			}
@@ -108,7 +108,7 @@ class notWSServerClient extends EventEmitter {
 			let msg = this.messenger.unpack(data);
 			this.emit('message', msg);
 			if(msg.service.type === CONST.MSG_TYPE.RESPONSE){
-				let request = this.extortRequest(msg.service.id);
+				let request = this.fullfillRequest(msg.service.id);
 				if(request !== null){
 					request.cb(msg);
 				}
@@ -128,8 +128,6 @@ class notWSServerClient extends EventEmitter {
 			this.logError(e);
 			if(e.message === CONST.ERR_MSG.MSG_CREDENTIALS_IS_NOT_VALID){
 				this.informClientAboutExperiedToken();
-			}else{
-				this.logMsg('token is ok');
 			}
 		}
 	}
@@ -138,7 +136,7 @@ class notWSServerClient extends EventEmitter {
 	*	Proxy for WebSocket event
 	*/
 	onWSPong(){
-		this.logDebug('in pong');
+		//this.logDebug('in pong');
 		this.emit('pong');
 	}
 
@@ -460,7 +458,7 @@ AUTHORIZING: 4
 		return false;
 	}
 
-	extortRequest(id){
+	fullfillRequest(id){
 		let reqIndex = this.findRequest(id);
 		if(reqIndex === false) {
 			this.logMsg(`failed to find request for response ${id}`);
@@ -672,7 +670,7 @@ AUTHORIZING: 4
 
 	ping(){
 		if(this.ws){
-			this.logDebug('out ping');
+			//this.logDebug('out ping');
 			this.ws.ping(CONST.noop);
 		}
 	}
