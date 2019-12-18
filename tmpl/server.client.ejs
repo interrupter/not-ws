@@ -97,7 +97,7 @@ class notWSServerClient extends EventEmitter {
 			}
 			this.messenger.validate(data);
 			let msg = this.messenger.unpack(data);
-			this.emit('message', msg);
+			this.emit('message', msg, this);
 			if(msg.service.type === CONST.MSG_TYPE.RESPONSE){
 				let request = this.fullfillRequest(msg.service.id);
 				if(request !== null){

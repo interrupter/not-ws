@@ -35,6 +35,7 @@ class notWSServer extends EventEmitter{
   *  options.server   - express http/s server
   *  options.port    -  server port
   *  options.routes  -  client routes
+  *  options.event.onmessage  -  when client sends a message
   */
   constructor(options = {}){
     super();
@@ -143,6 +144,12 @@ class notWSServer extends EventEmitter{
       wsConn.on('pong', CONST.heartbeat);
     }
     wsConn.once('errored', this.terminateAndRemoveWSClient.bind(this));
+    if(Object.prototype.hasOwnProperty.call(this.options,'events') &&
+      Object.prototype.hasOwnProperty.call(this.options.events,'onmessage' &&
+      LOG.isFunc(this.options.events.onmessage)
+      )){
+        wsConn.on('message', this.options.events.onmessage);
+    }
     this.wsClients.push(wsConn);
     this.logMsg(`New client from ${req.socket.remoteAddress}`);
     this.lastCount = this.wsClients.length;
@@ -179,6 +186,12 @@ class notWSServer extends EventEmitter{
 
   terminateAndRemoveWSClient(wsc){
     if (wsc){
+      if(Object.prototype.hasOwnProperty.call(this.options,'events') &&
+        Object.prototype.hasOwnProperty.call(this.options.events,'onmessage' &&
+        LOG.isFunc(this.options.events.onmessage)
+        )){
+          wsc.removeListener('message', this.options.events.onmessage);
+      }
       wsc.terminate();
       this.removeClient(wsc);
     }
@@ -230,7 +243,10 @@ class notWSServer extends EventEmitter{
   informClientAboutExperiedToken(conn, req){
     return new Promise((res, rej)=>{
     try{
-      let msg = {type:'__service', name: 'updateToken'};
+      let msg = {
+        type:'__service',
+        name: 'updateToken'
+      };
       conn.send(JSON.stringify(this.getMessengerForClient(conn, req).pack({}, msg)),
         (e)=>{
           if(e){rej(e);}

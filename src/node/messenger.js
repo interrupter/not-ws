@@ -1,8 +1,8 @@
 
-  const EventEmitter = require('events');
-  const validator = require('validator');
-  const uuidv4 = require('uuid/v4');
-  const CONST = require('./const.js');
+const EventEmitter = require('events');
+const validator = require('validator');
+const uuidv4 = require('uuid/v4');
+const CONST = require('./const.js');
 
 /**
  * set of default options
@@ -18,11 +18,11 @@ const DEFAULT_OPTIONS = {
     */
 	},
 
-  types:      {
-    'typeOfMessage':  ['list', 'of', 'name\'s', 'of', 'actions'],
-    'test': ['sayHello'],
-    '__service': ['updateToken'],
-  }
+	types:      {
+		'typeOfMessage':  ['list', 'of', 'name\'s', 'of', 'actions'],
+		'test': ['sayHello'],
+		'__service': ['updateToken'],
+	}
 
 };
 
@@ -179,18 +179,18 @@ class notWSMessage extends EventEmitter {
 		}
 		if (!this.validateType(this.getType(msg))) {
 			let err = new Error(CONST.ERR_MSG.MSG_TYPE_IS_NOT_VALID);
-      err.details = {
-        type: this.getType(msg)
-      };
-      throw err;
+			err.details = {
+				type: this.getType(msg)
+			};
+			throw err;
 		}
 		if (!this.validateTypeAndName(this.getType(msg), this.getName(msg))) {
-      let err = new Error(CONST.ERR_MSG.MSG_NAME_IS_NOT_VALID);
+			let err = new Error(CONST.ERR_MSG.MSG_NAME_IS_NOT_VALID);
 			err.details = {
-        type: this.getType(msg),
-        name: this.getName(msg)
-      };
-      throw err;
+				type: this.getType(msg),
+				name: this.getName(msg)
+			};
+			throw err;
 		}
 		return msg;
 	}
