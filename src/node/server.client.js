@@ -125,7 +125,7 @@ class notWSServerClient extends EventEmitter {
 					});
 			}
 		}catch(e){
-			this.logError(e);
+			this.logError(e, e.details);
 			if(e.message === CONST.ERR_MSG.MSG_CREDENTIALS_IS_NOT_VALID){
 				this.informClientAboutExperiedToken();
 			}

@@ -193,6 +193,32 @@ class notWSMessage extends EventEmitter {
 		}
 		return msg;
 	}
+
+	enableRoute(route, name){
+		if(!Object.prototype.hasOwnProperty.call(this.options, 'types')){
+			this.options.types = {};
+		}
+		if(!Object.prototype.hasOwnProperty.call(this.options.types, route)){
+			this.options.types[route] = [];
+		}
+		if(this.options.types[route].indexOf(name) === -1){
+			this.options.types[route].push(name);
+		}
+		return this;
+	}
+
+	disableRoute(route, name){
+		if(!Object.prototype.hasOwnProperty.call(this.options, 'types')){
+			this.options.types = {};
+		}
+		if(!Object.prototype.hasOwnProperty.call(this.options.types, route)){
+			this.options.types[route] = [];
+		}
+		if(this.options.types[route].indexOf(name) > -1){
+			this.options.types[route].splice(this.options.types[route].indexOf(name), 1);
+		}
+		return this;
+	}
 }
 
 

@@ -366,6 +366,10 @@ var notWSClient = (function () {
 	    return true;
 	  }
 
+	  getRoutes() {
+	    return this.routes;
+	  }
+
 	}
 
 	/* global  msCrypto */
@@ -654,6 +658,38 @@ var notWSClient = (function () {
 	    return msg;
 	  }
 
+	  enableRoute(route, name) {
+	    if (!Object.prototype.hasOwnProperty.call(this.options, 'types')) {
+	      this.options.types = {};
+	    }
+
+	    if (!Object.prototype.hasOwnProperty.call(this.options.types, route)) {
+	      this.options.types[route] = [];
+	    }
+
+	    if (this.options.types[route].indexOf(name) === -1) {
+	      this.options.types[route].push(name);
+	    }
+
+	    return this;
+	  }
+
+	  disableRoute(route, name) {
+	    if (!Object.prototype.hasOwnProperty.call(this.options, 'types')) {
+	      this.options.types = {};
+	    }
+
+	    if (!Object.prototype.hasOwnProperty.call(this.options.types, route)) {
+	      this.options.types[route] = [];
+	    }
+
+	    if (this.options.types[route].indexOf(name) > -1) {
+	      this.options.types[route].splice(this.options.types[route].indexOf(name), 1);
+	    }
+
+	    return this;
+	  }
+
 	}
 
 	//imports
@@ -896,7 +932,7 @@ var notWSClient = (function () {
 	        });
 	      }
 	    } catch (e) {
-	      this.logError(e);
+	      this.logError(e, e.details);
 	    }
 	  } //Подключение к websocket сервису.
 

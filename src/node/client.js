@@ -214,7 +214,7 @@ class notWSClient extends EventEmitter{
 					});
 			}
 		}catch(e){
-			this.logError(e);
+			this.logError(e, e.details);
 		}
 	}
 
