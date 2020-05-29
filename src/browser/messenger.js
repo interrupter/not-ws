@@ -48,6 +48,9 @@ class notWSMessage extends EventEmitter {
 	constructor(options = {}) {
 		super();
 		this.options = Object.assign({}, DEFAULT_OPTIONS, options);
+		if(Object.prototype.hasOwnProperty.call(this.options.types, CONST.MSG_TYPE.REQUEST) && !Object.prototype.hasOwnProperty.call(this.options.types, CONST.MSG_TYPE.RESPONSE)){
+			this.options.types[CONST.MSG_TYPE.RESPONSE] = this.options.types[CONST.MSG_TYPE.REQUEST];
+		}
 		return this;
 	}
 

@@ -20,10 +20,10 @@ const notWSMessenger = require('./messenger.js');
 
 class notWSClient extends EventEmitter{
 	constructor({
-		options,
-		messenger,
-		router
-	}){
+			options,
+			messenger,
+			router
+		}){
 		super();
 		let logger = options.logger;
 		//Основные параметры
@@ -43,14 +43,14 @@ class notWSClient extends EventEmitter{
 		this.jwtDate      = null; //Дата создания токена.
 
 		//logging
-		this.logMsg = logger?logger.log:LOG.genLogMsg(this.__name);
-		this.logDebug = logger?logger.debug:LOG.genLogDebug(this.__name);
-		this.logError = logger?logger.error:LOG.genLogError(this.__name);
-		//requests processing
-		this.requests = []; //Список текущих запросов к API.
-		this.reqTimeout = 15000; //Таймаут для выполнения запросов.
-		this.reqChkTimer = null; //Таймер для проверки таймаутов выполнения запросов.
-		this.reqChkStep = 2000; //Таймер для проверки таймаутов выполнения запросов.
+this.logMsg = logger?logger.log:LOG.genLogMsg(this.__name);
+this.logDebug = logger?logger.debug:LOG.genLogDebug(this.__name);
+this.logError = logger?logger.error:LOG.genLogError(this.__name);
+//requests processing
+this.requests = []; //Список текущих запросов к API.
+this.reqTimeout = 15000; //Таймаут для выполнения запросов.
+this.reqChkTimer = null; //Таймер для проверки таймаутов выполнения запросов.
+this.reqChkStep = 2000; //Таймер для проверки таймаутов выполнения запросов.
 
 
 		this.connect();
@@ -79,7 +79,7 @@ class notWSClient extends EventEmitter{
 		if(LOG.isFunc(this.options.getToken)){
 			return this.options.getToken();
 		}else{
-			return Promise.reject();
+				return Promise.reject();
 		}
 	}
 
@@ -94,7 +94,7 @@ class notWSClient extends EventEmitter{
 		}catch(e){
 			this.logError(e);
 		}
-	}
+	};
 
 	saveToken(token){
 		this.jwtToken = token;
@@ -320,7 +320,7 @@ class notWSClient extends EventEmitter{
 
 	isAutoReconnect(){
 		if (typeof this.options.autoReconnect !== 'undefined'){
-			return this.options.autoReconnect;
+			return this.options.autoReconnect
 		}else{
 			return CONST.CLIENT_AUTO_RECONNECT;
 		}
@@ -452,8 +452,8 @@ class notWSClient extends EventEmitter{
 				rej(e);
 			}
 		});
-	}
-}
+	};
+};
 
 module.exports = notWSClient;
 

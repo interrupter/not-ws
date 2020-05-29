@@ -40,14 +40,14 @@ class notWSServerClient extends EventEmitter {
 		this.__name = (this.options && Object.prototype.hasOwnProperty.call(this.options, 'name')) ? this.options.name : CONST.DEFAULT_CLIENT_NAME;
 		//common constructor part for client browser client, node client, node server client
 		//logging
-		this.logMsg = logger?logger.log:LOG.genLogMsg(this.__name);
-		this.logDebug = logger?logger.debug:LOG.genLogDebug(this.__name);
-		this.logError = logger?logger.error:LOG.genLogError(this.__name);
-		//requests processing
-		this.requests = []; //Список текущих запросов к API.
-		this.reqTimeout = 15000; //Таймаут для выполнения запросов.
-		this.reqChkTimer = null; //Таймер для проверки таймаутов выполнения запросов.
-		this.reqChkStep = 2000; //Таймер для проверки таймаутов выполнения запросов.
+this.logMsg = logger?logger.log:LOG.genLogMsg(this.__name);
+this.logDebug = logger?logger.debug:LOG.genLogDebug(this.__name);
+this.logError = logger?logger.error:LOG.genLogError(this.__name);
+//requests processing
+this.requests = []; //Список текущих запросов к API.
+this.reqTimeout = 15000; //Таймаут для выполнения запросов.
+this.reqChkTimer = null; //Таймер для проверки таймаутов выполнения запросов.
+this.reqChkStep = 2000; //Таймер для проверки таймаутов выполнения запросов.
 
 		//if was terminated
 		this.isTerminated = false;

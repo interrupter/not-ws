@@ -1,5 +1,5 @@
 const
-  uuidv4 = require('uuid/v4'),
+  uuidv4 = require('uuid').v4,
   expect = require('chai').expect,
   assert = require('chai').assert,
   notWSRouter = require('../src/node/router.js');

@@ -484,7 +484,7 @@ describe('notWSMessage', () => {
         }
       }),
       message = {
-        type: 'response',
+        type: 'anounce',
         name: 'auth'
       };
     expect(msg.validateType(message.type)).to.be.not.ok;
@@ -526,7 +526,7 @@ describe('notWSMessage', () => {
         }
       }),
       message = {
-        type: 'response',
+        type: 'lenta',
         name: 'list'
       };
     expect(msg.validateTypeAndName(message.type, message.name)).to.be.not.ok;
@@ -555,6 +555,20 @@ describe('notWSMessage', () => {
       }),
       message = {
         type: 'request',
+        name: 'list'
+      };
+    expect(msg.validateTypeAndName(message.type, message.name)).to.be.ok;
+  });
+
+  it('validateTypeAndName for Response without declaration: valid type, valid name, insecure', () => {
+    let msg = new notWSMessage({
+        secure: false,
+        types: {
+          request: ['list']
+        }
+      }),
+      message = {
+        type: 'response',
         name: 'list'
       };
     expect(msg.validateTypeAndName(message.type, message.name)).to.be.ok;
