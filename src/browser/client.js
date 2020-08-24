@@ -285,7 +285,11 @@ class notWSClient extends EventEmitter{
 	}
 
 	getConnectURI(){
-		let base = `ws://${this.options.host}:${this.options.port}/${this.options.path}`;
+		let protocol = 'ws';
+		if(this.options.ssl){
+			protocol = 'wss';
+		}
+		let base = `${protocol}://${this.options.host}:${this.options.port}/${this.options.path}`;
 		if(this.isSecure()){
 			return `${base}?token=${this.jwtToken}`;
 		}else{
