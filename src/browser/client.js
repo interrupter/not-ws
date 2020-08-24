@@ -1,7 +1,7 @@
 //imports
 
 
-/* global EventEmitter */
+import EventEmitter from 'wolfy87-eventemitter';
 import CONST from './const.js';
 import LOG from './log.js';
 import notWSRouter from './router.js';
