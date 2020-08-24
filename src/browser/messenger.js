@@ -1,5 +1,6 @@
 
-/* global validator,EventEmitter */
+import validator from 'validator';
+import EventEmitter from 'wolfy87-eventemitter';
 import CONST from './const.js';
 import uuidv4 from './uuidv4.js';
 
