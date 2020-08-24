@@ -280,7 +280,16 @@ this.reqChkStep = 2000; //Таймер для проверки таймауто�
 	}
 
 	getConnectURI(){
-		let base = `ws://${this.options.host}:${this.options.port}/${this.options.path}`;
+		let protocol = 'ws';
+		if(this.options.ssl){
+			protocol = 'wss';
+		}
+		let base = `${protocol}://${this.options.host}`;
+		if(this.options.port && parseInt(this.options.port) !== 80){
+			base = `${base}:${this.options.port}/${this.options.path}`;
+		}else{
+			base = `${base}/${this.options.path}`;
+		}
 		if(this.isSecure()){
 			return `${base}?token=${this.jwtToken}`;
 		}else{

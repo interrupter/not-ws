@@ -5843,7 +5843,13 @@ var notWSClient = (function () {
 	      protocol = 'wss';
 	    }
 
-	    let base = `${protocol}://${this.options.host}:${this.options.port}/${this.options.path}`;
+	    let base = `${protocol}://${this.options.host}`;
+
+	    if (this.options.port && parseInt(this.options.port) !== 80) {
+	      base = `${base}:${this.options.port}/${this.options.path}`;
+	    } else {
+	      base = `${base}/${this.options.path}`;
+	    }
 
 	    if (this.isSecure()) {
 	      return `${base}?token=${this.jwtToken}`;
