@@ -725,13 +725,12 @@ var notWSClient = (function () {
 	  capitalizeFirstLetter
 	};
 
-	/* global EventEmitter */
 	/**
 	* Routing for messages
 	*
 	*/
 
-	class notWSRouter extends EventEmitter {
+	class notWSRouter extends EventEmitter$1 {
 	  constructor(options, routes = {}, logger) {
 	    super();
 	    this.options = options;

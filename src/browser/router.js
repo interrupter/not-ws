@@ -1,5 +1,5 @@
 
-/* global EventEmitter */
+import EventEmitter from 'wolfy87-eventemitter';
 import LOG from './log.js';
 
 
