@@ -23,7 +23,6 @@ const DEFAULT_OPTIONS = {
 		'test': ['sayHello'],
 		'__service': ['updateToken'],
 	}
-
 };
 
 /***

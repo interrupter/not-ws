@@ -5839,8 +5839,12 @@ var notWSClient = (function () {
 	  getConnectURI() {
 	    let protocol = 'ws';
 
-	    if (this.options.ssl) {
-	      protocol = 'wss';
+	    if (this.options.protocol) {
+	      protocol = this.options.protocol;
+	    } else {
+	      if (this.options.ssl) {
+	        protocol = 'wss';
+	      }
 	    }
 
 	    let base = `${protocol}://${this.options.host}`;
