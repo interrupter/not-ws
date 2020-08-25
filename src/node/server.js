@@ -140,6 +140,7 @@ class notWSServer extends EventEmitter{
       messenger:    this.getMessengerForClient(connection, req),
       router:       this.getRouterForClient(connection, req)
     });
+    this.emit('connection', wsConn, req);
     if(this.options.ping){
       wsConn.on('pong', CONST.heartbeat);
     }
@@ -251,7 +252,6 @@ class notWSServer extends EventEmitter{
         (e)=>{
           if(e){rej(e);}
           else{res();}
-
         });
     }catch(e){
       rej(e);
