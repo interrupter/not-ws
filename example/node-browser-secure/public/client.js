@@ -5592,6 +5592,7 @@ var notWSClient = (function () {
 
 	      this.ws.close();
 	      this.stopReqChckTimer();
+	      this.emit('disconnected');
 	    } else {
 	      //eslint-disable-next-line no-console
 	      console.trace();
@@ -5799,6 +5800,7 @@ var notWSClient = (function () {
 	  }
 
 	  onOpen() {
+	    this.emit('connected');
 	    this.logMsg('Установлено подключение к WebSocket серверу.'); //Сбрасываем счётчик количества попыток подключения и данные об ошибках.
 
 	    this.connCount = 0;
@@ -5815,6 +5817,8 @@ var notWSClient = (function () {
 	  }
 
 	  onError(err) {
+	    this.emit('disconnected');
+
 	    if (this.connectTimeout) {
 	      clearInterval(this.connectTimeout);
 	      this.connectTimeout = false;
@@ -5826,6 +5830,7 @@ var notWSClient = (function () {
 
 
 	  onClose(event) {
+	    this.emit('disconnected');
 	    let reason = `${event.code}::` + CONST.mapWsCloseCodes(event);
 	    this.logMsg(`подключение разорвано: ${reason}`);
 
