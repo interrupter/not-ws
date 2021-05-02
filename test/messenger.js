@@ -1,7 +1,6 @@
 const
   uuidv4 = require('uuid/v4'),
   expect = require('chai').expect,
-  assert = require('chai').assert,
   notWSMessage = require('../src/node/messenger.js');
 
 before((done) => {

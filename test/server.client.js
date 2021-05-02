@@ -1,6 +1,5 @@
 const
   EventEmitter = require('events'),
-  uuidv4 = require('uuid/v4'),
   expect = require('chai').expect,
   CONST = require('../src/node/const.js'),
   notWSServerClient = require('../src/node/server.client.js');
@@ -41,7 +40,7 @@ state: 'offline',
       sock.terminate = ()=>{};
       new notWSServerClient({
         socket: sock,
-state: 'offline',
+        state: 'offline',
         ip: '127.0.0.1',
         credentials: {},
         options: {

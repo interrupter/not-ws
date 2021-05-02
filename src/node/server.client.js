@@ -637,7 +637,7 @@ AUTHORIZING: 4
 						}
 					}
 					resolve(response);
-				},secure);
+				}, secure);
 			} catch (e) {
 				reject(e);
 			}

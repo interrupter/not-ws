@@ -1,14 +1,16 @@
 //imports
-
 <% if (env === 'node'){ %>
 <%- include('./client.imports.node.ejs'); %>
 <% }else{ %>
 <%- include('./client.imports.browser.ejs'); %>
 <% } %>
 
+//class definition with minor env dependence
+<%- include('./client.common.ejs'); %>
 
-<% if (env === 'node'){ %>
-<%- include('./client.node.ejs'); %>
+//env dep export
+<% if (env == 'node') { %>
+module.exports = notWSClient;
 <% }else{ %>
-<%- include('./client.browser.ejs'); %>
+export default notWSClient;
 <% } %>

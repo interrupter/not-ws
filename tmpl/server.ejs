@@ -39,10 +39,13 @@ class notWSServer extends EventEmitter{
   */
   constructor(options = {}){
     super();
+    let logger = options.logger;
     this.options     = Object.assign({}, DEFAULT_OPTIONS, options);
-    this.logMsg     = LOG.genLogMsg(this.options.name?this.options.name:CONST.DEFAULT_SERVER_NAME);
-    this.logDebug   = LOG.genLogDebug(this.options.name?this.options.name:CONST.DEFAULT_SERVER_NAME);
-    this.logError   = LOG.genLogError(this.options.name?this.options.name:CONST.DEFAULT_SERVER_NAME);
+
+    this.logMsg = logger?logger.log:LOG.genLogMsg(this.options.name?this.options.name:CONST.DEFAULT_SERVER_NAME);
+		this.logDebug = logger?logger.debug:LOG.genLogDebug(this.options.name?this.options.name:CONST.DEFAULT_SERVER_NAME);
+		this.logError = logger?logger.error:LOG.genLogError(this.options.name?this.options.name:CONST.DEFAULT_SERVER_NAME);
+
     this.wsServer   = null;
     this.isClosing   = false;
     this.wsClients  = [];
@@ -178,11 +181,29 @@ class notWSServer extends EventEmitter{
   }
 
   closeServer(){
-
+    return new Promise((res, rej)=>{
+      try{
+        this.wsServer.close((e)=>{
+          if(e){
+            rej(e);
+          }else{
+            res();
+          }
+        });
+      }catch(e){
+        rej(e);
+      }
+    });
   }
 
   closeClientConnections(){
-
+    while(this.wsClients.length){
+      if(this.wsClients[0].isConnected()){
+        this.terminateAndRemoveWSClient(this.wsClients[0]);
+      }else{
+        this.removeClient(this.wsClients[0]);
+      }
+    }
   }
 
   terminateAndRemoveWSClient(wsc){
@@ -261,6 +282,10 @@ class notWSServer extends EventEmitter{
 
   /**
   * Broadcasting message to clients
+  * @param {string} type  type of the message
+  * @param {string} name  name of the message
+  * @param {object} payload data to be transmitted
+  * @secure {boolean} secure
   */
   broadcast(type, name, payload, secure = true, connFilter = undefined){
     this.getClients(connFilter).forEach((client)=>{
@@ -268,6 +293,11 @@ class notWSServer extends EventEmitter{
     });
   }
 
+  /**
+  * filtering clients by specified function and return resulting array
+  * @param {function} filter function to filter clients
+  * @returns {Array}
+  */
   getClients(filter){
     if(LOG.isFunc(filter)){
       return this.wsClients.filter(filter);

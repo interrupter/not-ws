@@ -8,6 +8,8 @@ import uuidv4 from './uuidv4.js';
  * set of default options
  */
 const DEFAULT_OPTIONS = {
+	validateType:         true, //validation of message type
+	validateTypeAndName:  true, //validation of message type and name
 	secure: false, // if true - all not validated credentials are wrong
 	securityException: ['request.auth'], //пример того как указывать пути без аутентификации, даже при secure=true
 	validators: { //additional validators for validate method
@@ -179,20 +181,24 @@ class notWSMessage extends EventEmitter {
 		) {
 			throw new Error(CONST.ERR_MSG.MSG_CREDENTIALS_IS_NOT_VALID);
 		}
-		if (!this.validateType(this.getType(msg))) {
-			let err = new Error(CONST.ERR_MSG.MSG_TYPE_IS_NOT_VALID);
-			err.details = {
-				type: this.getType(msg)
-			};
-			throw err;
+		if(this.options.validateType){
+			if (!this.validateType(this.getType(msg))) {
+  			let err = new Error(CONST.ERR_MSG.MSG_TYPE_IS_NOT_VALID);
+				err.details = {
+					type: this.getType(msg)
+				};
+				throw err;
+  		}
 		}
-		if (!this.validateTypeAndName(this.getType(msg), this.getName(msg))) {
-			let err = new Error(CONST.ERR_MSG.MSG_NAME_IS_NOT_VALID);
-			err.details = {
-				type: this.getType(msg),
-				name: this.getName(msg)
-			};
-			throw err;
+		if(this.options.validateTypeAndName){
+			if (!this.validateTypeAndName(this.getType(msg), this.getName(msg))) {
+				let err = new Error(CONST.ERR_MSG.MSG_NAME_IS_NOT_VALID);
+  			err.details = {
+					type: this.getType(msg),
+					name: this.getName(msg)
+				};
+				throw err;
+  		}
 		}
 		return msg;
 	}
@@ -212,10 +218,10 @@ class notWSMessage extends EventEmitter {
 
 	disableRoute(route, name){
 		if(!Object.prototype.hasOwnProperty.call(this.options, 'types')){
-			this.options.types = {};
+			return this;
 		}
 		if(!Object.prototype.hasOwnProperty.call(this.options.types, route)){
-			this.options.types[route] = [];
+			return this;
 		}
 		if(this.options.types[route].indexOf(name) > -1){
 			this.options.types[route].splice(this.options.types[route].indexOf(name), 1);
