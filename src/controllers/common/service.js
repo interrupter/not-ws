@@ -1,4 +1,4 @@
-import notWSClient from '../browser/client.js';
+import notWSClient from '../../browser/client.js';
 
 class nsWS {
   constructor(app) {
