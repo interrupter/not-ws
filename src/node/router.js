@@ -109,7 +109,7 @@ class notWSRouter extends EventEmitter{
 	}
 
 	getRoutes(){
-		return this.routes
+		return this.routes;
 	}
 
 }

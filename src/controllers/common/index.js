@@ -1,2 +1,5 @@
+import nsWS from './service.js';
 
-export default {};
+const services = {nsWS};
+
+export default {services};
