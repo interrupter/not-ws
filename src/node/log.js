@@ -99,16 +99,16 @@ let capitalizeFirstLetter = function(name){
 
 
 
-exports.TZ_OFFSET 	 = TZ_OFFSET;
-exports.logMsg       = logMsg;
-exports.logError     = logError;
-exports.genLogMsg    = genLogMsg;
-exports.genLogError  = genLogError;
-exports.genLogDebug  = genLogDebug;
-exports.isFunc       = isFunc;
-exports.isArray      = isArray;
-exports.localIsoDate = localIsoDate;
-exports.tryParseJSON = tryParseJSON;
-exports.capitalizeFirstLetter = capitalizeFirstLetter;
+	exports.TZ_OFFSET 	 = TZ_OFFSET;
+	exports.logMsg       = logMsg;
+	exports.logError     = logError;
+	exports.genLogMsg    = genLogMsg;
+	exports.genLogError  = genLogError;
+	exports.genLogDebug  = genLogDebug;
+	exports.isFunc       = isFunc;
+	exports.isArray      = isArray;
+	exports.localIsoDate = localIsoDate;
+	exports.tryParseJSON = tryParseJSON;
+	exports.capitalizeFirstLetter = capitalizeFirstLetter;
 
 

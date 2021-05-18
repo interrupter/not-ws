@@ -143,13 +143,17 @@ class notWSClient extends EventEmitter{
 			}
 			this.messenger.validate(data);
 			let msg = this.messenger.unpack(data);
+			//general event
 			this.emit('message', msg);
+			//specific event
+			this.emit(msg.service.type + ':' + msg.service.name, msg.service, msg.payload, this.ws);
 			if(msg.service.type === CONST.MSG_TYPE.RESPONSE){
 				let request = this.fullfillRequest(msg.service.id);
 				if(request !== null){
 					request.cb(msg);
 				}
 			}else if(msg.service.type === CONST.MSG_TYPE.EVENT){
+				//old event type
 				this.emit('remote.' + msg.service.name, msg.service, msg.payload, this.ws);
 			}else{
 				this.router.route(msg.service, msg.payload, this.ws)
