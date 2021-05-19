@@ -21,12 +21,16 @@ class nsWS {
       if(optionsFromAppConfig){
         options.options = Object.assign({}, {...optionsFromAppConfig});
       }
+      if(Object.prototype.hasOwnProperty.call(opts, 'routes')){
+        options.options.routes = opts.routes;
+      }
       //integrating with collected from modules
       for(let optName in ['options', 'messenger', 'router']){
         if(Object.prototype.hasOwnProperty.call(opts, optName)){
           options[optName] = opts[optName];
         }
       }
+
       let client = new notWSClient(options);
       this.app.setWSClient(name, client);
       if(Object.prototype.hasOwnProperty.call(opts, 'routes')){

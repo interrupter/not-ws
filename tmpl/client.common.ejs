@@ -22,7 +22,7 @@ class notWSClient extends EventEmitter{
     this.errConnMsg = null; //Идентификатор сообщения об ошибке подключения к вебсокет серверу.
     this.firstConn = true;
     this.messenger = messenger?messenger: new notWSMessenger(options.messenger?options.messenger:{});
-    this.router = router?router: new notWSRouter(options.router?options.router:{});
+    this.router = router?router: new notWSRouter(options.router?options.router:{}, options.routes?options.routes:{});
     this.router.on('updateToken', this.renewToken.bind(this));
     //jwt
     this.jwtToken = null; //Токен авторизации.

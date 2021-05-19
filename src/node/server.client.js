@@ -19,6 +19,7 @@ const DEFAULT_OPTIONS = {
 
 class notWSServerClient extends EventEmitter {
 	constructor({
+		identity,
 		socket,
 		ip,
 		credentials,
@@ -30,6 +31,7 @@ class notWSServerClient extends EventEmitter {
 	}) {
 		super();
 		//basic params
+		this.identity = identity;
 		this.ws = socket;
 		this.ws.ip = ip;
 		this.ip = ip;

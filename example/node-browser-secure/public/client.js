@@ -7801,7 +7801,7 @@ var notWSClient = (function () {
 
 	    this.firstConn = true;
 	    this.messenger = messenger ? messenger : new notWSMessage(options.messenger ? options.messenger : {});
-	    this.router = router ? router : new notWSRouter(options.router ? options.router : {});
+	    this.router = router ? router : new notWSRouter(options.router ? options.router : {}, options.routes ? options.routes : {});
 	    this.router.on('updateToken', this.renewToken.bind(this)); //jwt
 
 	    this.jwtToken = null; //Токен авторизации.

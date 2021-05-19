@@ -122,6 +122,15 @@ class notWSServer extends EventEmitter{
     }
   }
 
+  getClientIdentity(req){
+    if(this.isSecure()){
+      let token = url.parse(req.url, true).query.token;
+      return jwt.verify(token, this.options.jwt.key);
+    }else{
+      return false;
+    }
+  }
+
   onConnection(connection, req){
     if(this.isSecure()){
       this.logMsg('Secure server');
@@ -136,6 +145,7 @@ class notWSServer extends EventEmitter{
       }
     }
     let wsConn = new notWSServerClient({
+      identity:     this.getClientIdentity(req),
       socket:       connection,
       state:        'online',
       ip:           req.socket.remoteAddress,
@@ -304,6 +314,30 @@ class notWSServer extends EventEmitter{
     }else{
       return this.wsClients;
     }
+  }
+
+  /**
+  * filtering clients by specified function and return first passing test
+  * @param {function} test function to test clients and found required
+  * @returns {notWSServerClient}
+  */
+  getClient({test, _id}){
+    if(!LOG.isFunc(test) && _id){
+      test = (client)=>{
+        if(client.identity){
+          if(client.identity && client.identity._id){
+            return client.identity._id.toString() === _id.toString();
+          }
+        }
+        return false;
+      }
+    }
+    for(let t in this.wsClients){
+      if(test(this.wsClients[t])){
+        return this.wsClients[t];
+      }
+    }
+    return false;
   }
 
 }
