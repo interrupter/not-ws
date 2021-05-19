@@ -7854,7 +7854,7 @@ var notWSClient = (function () {
 	  getToken(renew = false) {
 	    let token = localStorage.getItem('token');
 
-	    if (typeof token !== 'undefined' && token && !renew) {
+	    if (typeof token !== 'undefined' && token !== 'undefined' && token && !renew) {
 	      return Promise.resolve(token);
 	    } else {
 	      if (LOG.isFunc(this.options.getToken)) {

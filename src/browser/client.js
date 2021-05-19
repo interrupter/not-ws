@@ -85,7 +85,7 @@ class notWSClient extends EventEmitter{
 	getToken(renew = false){
     
 		let token = localStorage.getItem('token');
-		if((typeof token !== 'undefined') && token && !renew){
+		if((typeof token !== 'undefined') && (token !== 'undefined') && token && !renew){
 			return Promise.resolve(token);
 		}else{
     

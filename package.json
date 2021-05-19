@@ -1,6 +1,6 @@
 {
   "name": "not-ws",
-  "version": "0.0.27",
+  "version": "0.0.28",
   "description": "not-* family module for WebSocket communication",
   "main": "index.js",
   "scripts": {
@@ -35,9 +35,9 @@
     "rollup-plugin-node-resolve": "^5.2.0",
     "url": "^0.11.0",
     "uuid": "*",
-    "validator": "^13.5.2",
+    "validator": "^13.6.0",
     "wolfy87-eventemitter": "^5.2.9",
-    "ws": "^7.4.4"
+    "ws": "^7.4.5"
   },
   "devDependencies": {
     "@babel/core": "*",
