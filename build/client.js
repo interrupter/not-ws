@@ -7920,7 +7920,10 @@ var notWSClient = (function () {
 	        }
 	      } else if (msg.service.type === CONST.MSG_TYPE.EVENT) {
 	        //old event type
-	        this.emit('remote.' + msg.service.name, msg.service, msg.payload, this.ws);
+	        //this.emit('remote.' + msg.service.name, msg.service, msg.payload, this.ws);
+	        this.router.route(msg.service, msg.payload, this.ws).catch(e => {
+	          this.logError(e);
+	        });
 	      } else {
 	        this.router.route(msg.service, msg.payload, this.ws).then(responseData => {
 	          this.respond(responseData, {
