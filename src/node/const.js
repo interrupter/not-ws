@@ -81,51 +81,52 @@ const ERR_MSG = {
 	REQUEST_TIMEOUT: 'Request timeout',
 	MSG_ID_IS_NOT_VALID: 'Message ID is not valid uuidv4',
 	MSG_CREDENTIALS_IS_NOT_VALID: 'Message Credentials is not valid!',
-	MSG_TYPE_IS_NOT_VALID:	'Message Type is not valid!',
-	MSG_NAME_IS_NOT_VALID:	'Message Name is not valid!',
+	MSG_TYPE_IS_NOT_VALID:  'Message Type is not valid!',
+	MSG_NAME_IS_NOT_VALID:  'Message Name is not valid!',
 };
-
 
 const PING_TIMEOUT = 30000;
 const HEARTBEAT_INTERVAL = 30000;
 const CLIENT_RECONNECT_TIMEOUT = 5000;
 const CLIENT_RECONNECT_TIMEOUT_LONG = 30000;
 const CLIENT_AUTO_RECONNECT = true;
-function  noop() {}
-function heartbeat() { this.isAlive = true;}
 
 const TOKEN_TTL = 1800;
 const TOKEN_RENEW_TTL = 300;
 
 const MSG_TYPE = {
-	REQUEST: 		'request',
-	RESPONSE: 	'response',
-	EVENT: 			'event',
-	COMMAND: 		'command',
+	REQUEST:     'request',
+	RESPONSE:   'response',
+	EVENT:       'event',
+	COMMAND:     'command',
 };
 
+const DEV_ENV = 'development';
 
-	module.exports = {
-		STATE,
-		STATE_NAME,
-		ACTIVITY,
-		ACTIVITY_NAME,
-		WS_CLOSURE_REASONS,
-		mapWsCloseCodes,
-		HEARTBEAT_INTERVAL,
-		SYMBOL_ACTIVITY,
-		SYMBOL_STATE,
-		DEFAULT_SERVER_NAME,
-		DEFAULT_CLIENT_NAME,
-		ERR_MSG,
-		PING_TIMEOUT,
-		CLIENT_RECONNECT_TIMEOUT,
-		CLIENT_RECONNECT_TIMEOUT_LONG,
-		CLIENT_AUTO_RECONNECT,
-		heartbeat,
-		noop,
-		MSG_TYPE,
-		TOKEN_TTL,
-		TOKEN_RENEW_TTL,
-	};
+
+const ENV_TYPE = process.env.NODE_ENV;
+
+module.exports = {
+	STATE,
+	STATE_NAME,
+	ACTIVITY,
+	ACTIVITY_NAME,
+	WS_CLOSURE_REASONS,
+	mapWsCloseCodes,
+	HEARTBEAT_INTERVAL,
+	SYMBOL_ACTIVITY,
+	SYMBOL_STATE,
+	DEFAULT_SERVER_NAME,
+	DEFAULT_CLIENT_NAME,
+	ERR_MSG,
+	PING_TIMEOUT,
+	CLIENT_RECONNECT_TIMEOUT,
+	CLIENT_RECONNECT_TIMEOUT_LONG,
+	CLIENT_AUTO_RECONNECT,
+	MSG_TYPE,
+	TOKEN_TTL,
+	TOKEN_RENEW_TTL,
+	ENV_TYPE,
+	DEV_ENV,
+};
 

@@ -25,7 +25,7 @@ describe('notWSRouter', () => {
 
   it('creating with undefined routes', (done) => {
       try {
-        new notWSRouter({}, undefined);
+        new notWSRouter({routes:undefined});
         done();
       } catch (e) {
         done(e);
@@ -35,7 +35,7 @@ describe('notWSRouter', () => {
 
   it('creating with empty routes', (done) => {
     try {
-      new notWSRouter({}, {})
+      new notWSRouter({routes:{}})
       done();
     } catch (e) {
       done(e);
@@ -49,7 +49,7 @@ describe('notWSRouter', () => {
           man(){}
         }
       },
-      router = new notWSRouter({}, routes);
+      router = new notWSRouter({routes});
 
     expect(router.routes.method).to.be.deep.equal(routes.method);
   });
@@ -61,7 +61,7 @@ describe('notWSRouter', () => {
           man(){}
         }
       },
-      router = new notWSRouter({}, routes);
+      router = new notWSRouter({routes});
       try{
         router.route({type: 'many', name: 'soy', cred: null}, {});
         done(new Error('this should throw, but worked out!'));
@@ -81,7 +81,7 @@ describe('notWSRouter', () => {
           }
         }
       },
-      router = new notWSRouter({}, routes);
+      router = new notWSRouter({routes});
       let t = router.route({type: 'method', name: 'man', cred: null}, {}, {ip: '127.0.0.1'});
       expect(t).to.instanceof(Promise);
   });
@@ -95,7 +95,7 @@ describe('notWSRouter', () => {
           }
         }
       },
-      router = new notWSRouter({}, routes);
+      router = new notWSRouter({routes});
       try{
         router.setRoutesForType(null, {});
         done(new Error('this should throw, but worked out!'));
@@ -115,7 +115,7 @@ describe('notWSRouter', () => {
           }
         }
       },
-      router = new notWSRouter({}, routes);
+      router = new notWSRouter({routes});
       try{
         router.setRoutesForType({}, {});
         done(new Error('this should throw, but worked out!'));
@@ -135,7 +135,7 @@ describe('notWSRouter', () => {
           }
         }
       },
-      router = new notWSRouter({}, routes);
+      router = new notWSRouter({routes});
       try{
         router.setRoutesForType(undefined, {});
         done(new Error('this should throw, but worked out!'));
@@ -155,7 +155,7 @@ describe('notWSRouter', () => {
           }
         }
       },
-      router = new notWSRouter({}, routes);
+      router = new notWSRouter({routes});
       try{
         router.setRoutesForType('', {});
         done(new Error('this should throw, but worked out!'));
@@ -175,7 +175,7 @@ describe('notWSRouter', () => {
           }
         }
       },
-      router = new notWSRouter({}, routes);
+      router = new notWSRouter({routes});
       try{
         router.setRoutesForType('test', null);
         done(new Error('this should throw, but worked out!'));
@@ -195,7 +195,7 @@ describe('notWSRouter', () => {
           }
         }
       },
-      router = new notWSRouter({}, routes);
+      router = new notWSRouter({routes});
       try{
         router.setRoutesForType('test', undefined);
         done(new Error('this should throw, but worked out!'));
@@ -215,7 +215,7 @@ describe('notWSRouter', () => {
           }
         }
       },
-      router = new notWSRouter({}, routes);
+      router = new notWSRouter({routes});
       try{
         router.setRoutesForType('test', 12.3);
         done(new Error('this should throw, but worked out!'));
@@ -235,7 +235,7 @@ describe('notWSRouter', () => {
           }
         }
       },
-      router = new notWSRouter({}, routes);
+      router = new notWSRouter({routes});
       router.setRoutesForType('test', {me(){}});
       expect(router.routes).to.have.property('test');
       expect(router.routes.test).to.have.keys(['me']);
@@ -250,7 +250,7 @@ describe('notWSRouter', () => {
           }
         }
       },
-      router = new notWSRouter({}, routes);
+      router = new notWSRouter({routes});
       router.setRoutesForType('test', {me(){}});
       expect(router.routes).to.have.property('test');
       expect(router.routes.test).to.have.keys(['me', 'man']);
@@ -266,7 +266,7 @@ describe('notWSRouter', () => {
           }
         }
       },
-      router = new notWSRouter({}, routes);
+      router = new notWSRouter({routes});
       try{
         router.unsetRoutesForType('test', null);
         done(new Error('this should throw, but worked out!'));
@@ -286,7 +286,7 @@ describe('notWSRouter', () => {
           }
         }
       },
-      router = new notWSRouter({}, routes);
+      router = new notWSRouter({routes});
       try{
         router.validateRoutesList(undefined);
         done(new Error('this should throw, but worked out!'));
@@ -306,7 +306,7 @@ describe('notWSRouter', () => {
           }
         }
       },
-      router = new notWSRouter({}, routes);
+      router = new notWSRouter({routes});
       router.unsetRoutesForType('test', ['man']);
       expect(Object.keys(router.routes).length).to.be.equal(1);
       router.unsetRoutesForType('__service', ['updateToken']);
@@ -328,7 +328,7 @@ describe('notWSRouter', () => {
           }
         }
       },
-      router = new notWSRouter({}, routes);
+      router = new notWSRouter({routes});
       router.unsetRoutesForType('test', ['man', 'woman']);
       expect(Object.keys(router.routes).length).to.be.equal(2);
       expect(router.routes.test).to.have.keys(['kid']);
@@ -349,7 +349,7 @@ describe('notWSRouter', () => {
           }
         }
       },
-      router = new notWSRouter({}, routes);
+      router = new notWSRouter({routes});
       router.unsetRoutesForType('test', ['man', 'woman', 'oldman']);
       expect(Object.keys(router.routes).length).to.be.equal(2);
       expect(router.routes.test).to.have.keys(['kid']);
@@ -370,7 +370,7 @@ describe('notWSRouter', () => {
           }
         }
       },
-      router = new notWSRouter({}, routes);
+      router = new notWSRouter({routes});
       router.unsetRoutesForType('test');
       expect(Object.keys(router.routes).length).to.be.equal(2);
       expect(router.routes.test).to.have.keys(['kid', 'woman', 'man']);
@@ -391,7 +391,7 @@ describe('notWSRouter', () => {
           }
         }
       },
-      router = new notWSRouter({}, routes);
+      router = new notWSRouter({routes});
       router.unsetRoutesForType('tst', ['man', 'woman']);
       expect(Object.keys(router.routes).length).to.be.equal(2);
       expect(router.routes.test).to.have.keys(['kid', 'man', 'woman']);

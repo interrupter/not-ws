@@ -1,6 +1,6 @@
 {
   "name": "not-ws",
-  "version": "0.0.31",
+  "version": "0.1.0",
   "description": "not-* family module for WebSocket communication",
   "main": "index.js",
   "scripts": {
@@ -9,6 +9,7 @@
     "prelint": "npm run buildtest",
     "pretest": "npm run lint",
     "test": "./node_modules/.bin/mocha --reporter spec",
+    "retest": "./node_modules/.bin/mocha --require async-dump --reporter spec",
     "lint": "./node_modules/.bin/eslint ./src/**/** --fix",
     "docs": "./node_modules/.bin/jsdoc -c jsdoc.json",
     "cover": "nyc npm test"
@@ -29,15 +30,12 @@
   },
   "homepage": "https://github.com/interrupter/not-ws#readme",
   "dependencies": {
-    "jsonwebtoken": "^8.5.1",
-    "node-fetch": "^2.6.1",
-    "rollup-plugin-commonjs": "^10.1.0",
-    "rollup-plugin-node-resolve": "^5.2.0",
-    "url": "^0.11.0",
+    "jsonwebtoken": "*",
+    "url": "*",
     "uuid": "*",
-    "validator": "^13.6.0",
-    "wolfy87-eventemitter": "^5.2.9",
-    "ws": "^7.4.5"
+    "validator": "*",
+    "wolfy87-eventemitter": "*",
+    "ws": "*"
   },
   "devDependencies": {
     "@babel/core": "*",
@@ -52,6 +50,8 @@
     "mocha": "*",
     "nyc": "*",
     "rollup": "*",
+    "rollup-plugin-commonjs": "*",
+    "rollup-plugin-node-resolve": "*",
     "rollup-plugin-babel": "*",
     "rollup-plugin-eslint": "*",
     "rollup-plugin-filesize": "*",

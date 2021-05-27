@@ -2,7 +2,8 @@
 import validator from 'validator';
 import EventEmitter from 'wolfy87-eventemitter';
 import CONST from './const.js';
-import uuidv4 from './uuidv4.js';
+import Func from './func.js';
+const { v4: uuidv4 } = require('uuid');
 
 /**
  * set of default options
@@ -19,7 +20,6 @@ const DEFAULT_OPTIONS = {
     }
     */
 	},
-
 	types:      {
 		'typeOfMessage':  ['list', 'of', 'name\'s', 'of', 'actions'],
 		'test': ['sayHello'],
@@ -46,11 +46,11 @@ message format for this default adaptor
  * Creates standart interface, mostly freeing other parts from
  * understanding message inner structure
  */
-class notWSMessage extends EventEmitter {
+class notWSMessenger extends EventEmitter {
 	constructor(options = {}) {
 		super();
 		this.options = Object.assign({}, DEFAULT_OPTIONS, options);
-		if(Object.prototype.hasOwnProperty.call(this.options.types, CONST.MSG_TYPE.REQUEST) && !Object.prototype.hasOwnProperty.call(this.options.types, CONST.MSG_TYPE.RESPONSE)){
+		if(Func.ObjHas(this.options.types, CONST.MSG_TYPE.REQUEST) && !Func.ObjHas(this.options.types, CONST.MSG_TYPE.RESPONSE)){
 			this.options.types[CONST.MSG_TYPE.RESPONSE] = this.options.types[CONST.MSG_TYPE.REQUEST];
 		}
 		return this;
@@ -154,7 +154,7 @@ class notWSMessage extends EventEmitter {
 	}
 
 	validateTypeAndName(type, name) {
-		if (this.options.types && Object.prototype.hasOwnProperty.call(this.options.types, type)) {
+		if (this.options.types && Func.ObjHas(this.options.types, type)) {
 			return this.options.types[type].indexOf(name) > -1;
 		}
 		return false;
@@ -183,31 +183,31 @@ class notWSMessage extends EventEmitter {
 		}
 		if(this.options.validateType){
 			if (!this.validateType(this.getType(msg))) {
-  			let err = new Error(CONST.ERR_MSG.MSG_TYPE_IS_NOT_VALID);
+				let err = new Error(CONST.ERR_MSG.MSG_TYPE_IS_NOT_VALID);
 				err.details = {
 					type: this.getType(msg)
 				};
 				throw err;
-  		}
+			}
 		}
 		if(this.options.validateTypeAndName){
 			if (!this.validateTypeAndName(this.getType(msg), this.getName(msg))) {
 				let err = new Error(CONST.ERR_MSG.MSG_NAME_IS_NOT_VALID);
-  			err.details = {
+				err.details = {
 					type: this.getType(msg),
 					name: this.getName(msg)
 				};
 				throw err;
-  		}
+			}
 		}
 		return msg;
 	}
 
 	enableRoute(route, name){
-		if(!Object.prototype.hasOwnProperty.call(this.options, 'types')){
+		if(!Func.ObjHas(this.options, 'types')){
 			this.options.types = {};
 		}
-		if(!Object.prototype.hasOwnProperty.call(this.options.types, route)){
+		if(!Func.ObjHas(this.options.types, route)){
 			this.options.types[route] = [];
 		}
 		if(this.options.types[route].indexOf(name) === -1){
@@ -217,10 +217,10 @@ class notWSMessage extends EventEmitter {
 	}
 
 	disableRoute(route, name){
-		if(!Object.prototype.hasOwnProperty.call(this.options, 'types')){
+		if(!Func.ObjHas(this.options, 'types')){
 			return this;
 		}
-		if(!Object.prototype.hasOwnProperty.call(this.options.types, route)){
+		if(!Func.ObjHas(this.options.types, route)){
 			return this;
 		}
 		if(this.options.types[route].indexOf(name) > -1){
@@ -231,5 +231,5 @@ class notWSMessage extends EventEmitter {
 }
 
 
-export default notWSMessage;
+export default notWSMessenger;
 

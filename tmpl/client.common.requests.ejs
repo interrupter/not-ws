@@ -29,7 +29,7 @@
 		//Удаление элемента из списка запросов.
 		this.requests.splice(reqIndex, 1);
 		//Выполнение callback'а запроса.
-		if(LOG.isFunc(request.cb)) {
+		if(Func.isFunc(request.cb)) {
 			return request;
 		} else {
 			return null;
@@ -63,7 +63,7 @@
 				return;
 			}
 			let request = this.requests[reqIndex];
-			if (LOG.isFunc(request.cb)) {
+			if (Func.isFunc(request.cb)) {
 				request.cb(CONST.ERR_MSG.REQUEST_TIMEOUT);
 			} else {
 				this.logMsg(`timeout check:Не задан callback для запроса с id: ${reqId}`);

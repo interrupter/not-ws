@@ -1,6 +1,6 @@
 
 const EventEmitter = require('events');
-const LOG = require('./log.js');
+const Func = require('./func.js');
 
 
 /**
@@ -9,13 +9,12 @@ const LOG = require('./log.js');
 */
 
 class notWSRouter extends EventEmitter{
-	constructor(options, routes = {}, logger){
+	constructor({name, routes = {}, logger}){
 		super();
-		this.options = options;
-		this.__name = 'notWSRouter';
-		this.logMsg = logger?logger.log:LOG.genLogMsg(this.__name);
-		this.logDebug = logger?logger.debug:LOG.genLogDebug(this.__name);
-		this.logError = logger?logger.error:LOG.genLogError(this.__name);
+		this.__name = name || 'notWSRouter';
+		this.logMsg = logger?logger.log:()=>{};
+		this.logDebug = logger?logger.debug:()=>{};
+		this.logError = logger?logger.error:()=>{};
 		this.routes = {
 			__service: {
 				updateToken:()=>{
@@ -43,13 +42,16 @@ class notWSRouter extends EventEmitter{
                       name - action name
                       cred - some credentials info
     @params {object}  data  payload information from message
-		@params {object}  conn  WS Connection
+    @params {object}  conn  WS Connection
     @returns  {Promise} from targeted action or throwing Error if route doesn't exist
   */
 	route({type, name, cred}, data, conn){
-		if(Object.prototype.hasOwnProperty.call(this.routes, type) && Object.prototype.hasOwnProperty.call(this.routes[type], name)){
+		if(
+			Func.ObjHas(this.routes, type) &&
+      Func.ObjHas(this.routes[type], name)
+		){
 			this.logMsg(conn.ip, type, name);
-			return this.routes[type][name](data, cred, conn);
+			return this.routes[type][name]({data, cred, conn});
 		}
 		throw (new Error(`Route not found ${type}/${name}`));
 	}
@@ -63,7 +65,7 @@ class notWSRouter extends EventEmitter{
 	setRoutesForType(type, routes){
 		this.validateType(type);
 		this.validateRoutes(routes);
-		if (Object.prototype.hasOwnProperty.call(this.routes, type)){
+		if (Func.ObjHas(this.routes, type)){
 			this.routes[type] = Object.assign(this.routes[type], routes);
 		}else{
 			this.routes[type] = routes;
@@ -74,9 +76,9 @@ class notWSRouter extends EventEmitter{
 	unsetRoutesForType(type, list = []){
 		this.validateType(type);
 		this.validateRoutesList(list);
-		if (Object.prototype.hasOwnProperty.call(this.routes, type)){
+		if (Func.ObjHas(this.routes, type)){
 			for(let name of list){
-				if(Object.prototype.hasOwnProperty.call(this.routes[type], name)){
+				if(Func.ObjHas(this.routes[type], name)){
 					delete this.routes[type][name];
 				}
 			}
@@ -109,7 +111,7 @@ class notWSRouter extends EventEmitter{
 	}
 
 	getRoutes(){
-		return this.routes
+		return this.routes;
 	}
 
 }

@@ -38,38 +38,51 @@ let opts = {
 *	SERVER_CLIENT - notWSServerClient class
 *	CLIENT - notWSClient class
 */
-const TEMPLATE_SERVER = path.join(__dirname, '../tmpl/server.ejs');
-const OUTPUT_NODE_SERVER = path.join(opts['out-node'], 'server.js');
 
-const TEMPLATE_SERVER_CLIENT = path.join(__dirname, '../tmpl/server.client.ejs');
-const OUTPUT_NODE_SERVER_CLIENT = path.join(opts['out-node'], 'server.client.js');
-
-const TEMPLATE_CLIENT = path.join(__dirname, '../tmpl/client.ejs');
-const OUTPUT_NODE_CLIENT = path.join(opts['out-node'], 'client.js');
-const OUTPUT_BROWSER_CLIENT = path.join(opts['out-browser'], 'client.js');
-
-const TEMPLATE_LOG = path.join(__dirname, '../tmpl/log.ejs');
-const OUTPUT_NODE_LOG = path.join(opts['out-node'], 'log.js');
-const OUTPUT_BROWSER_LOG = path.join(opts['out-browser'], 'log.js');
-
-const TEMPLATE_CONST = path.join(__dirname, '../tmpl/const.ejs');
-const OUTPUT_NODE_CONST = path.join(opts['out-node'], 'const.js');
-const OUTPUT_BROWSER_CONST = path.join(opts['out-browser'], 'const.js');
-
-const TEMPLATE_MESSENGER = path.join(__dirname, '../tmpl/messenger.ejs');
-const OUTPUT_NODE_MESSENGER = path.join(opts['out-node'], 'messenger.js');
-const OUTPUT_BROWSER_MESSENGER = path.join(opts['out-browser'], 'messenger.js');
-
-const TEMPLATE_ROUTER = path.join(__dirname, '../tmpl/router.ejs');
-const OUTPUT_NODE_ROUTER = path.join(opts['out-node'], 'router.js');
-const OUTPUT_BROWSER_ROUTER = path.join(opts['out-browser'], 'router.js');
-
-const TEMPLATE_UUIDV4 = path.join(__dirname, '../tmpl/uuidv4.ejs');
-const OUTPUT_BROWSER_UUIDV4 = path.join(opts['out-browser'], 'uuidv4.js');
+const files = [
+	{
+		tmpl: path.join(__dirname, '../tmpl/server.ejs'),
+		node: path.join(opts['out-node'], 'server.js')
+	},
+	{
+		tmpl: path.join(__dirname, '../tmpl/server.client.ejs'),
+		node: path.join(opts['out-node'], 'server.client.js')
+	},
+	{
+		tmpl: path.join(__dirname, '../tmpl/client.ejs'),
+		node: path.join(opts['out-node'], 'client.js'),
+		browser: path.join(opts['out-browser'], 'client.js')
+	},
+	{
+		tmpl: path.join(__dirname, '../tmpl/func.ejs'),
+		node: path.join(opts['out-node'], 'func.js'),
+		browser: path.join(opts['out-browser'], 'func.js')
+	},
+	{
+		tmpl: path.join(__dirname, '../tmpl/const.ejs'),
+		node: path.join(opts['out-node'], 'const.js'),
+		browser: path.join(opts['out-browser'], 'const.js')
+	},
+	{
+		tmpl: path.join(__dirname, '../tmpl/messenger.ejs'),
+		node: path.join(opts['out-node'], 'messenger.js'),
+		browser: path.join(opts['out-browser'], 'messenger.js')
+	},
+	{
+		tmpl: path.join(__dirname, '../tmpl/router.ejs'),
+		node: path.join(opts['out-node'], 'router.js'),
+		browser: path.join(opts['out-browser'], 'router.js')
+	},
+	{
+		tmpl: path.join(__dirname, '../tmpl/connection.ejs'),
+		node: path.join(opts['out-node'], 'connection.js'),
+		browser: path.join(opts['out-browser'], 'connection.js')
+	},
+];
 
 function renderScript(input, options, dest){
 	return new Promise((resolve ,reject)=>{
-		let js = ejs.renderFile(input, options, (err, res)=>{
+		ejs.renderFile(input, options, (err, res)=>{
 			if(err){
 				reject(err);
 			}else{
@@ -82,99 +95,18 @@ function renderScript(input, options, dest){
 	});
 }
 
-let tasks = [
-	renderScript(
-		TEMPLATE_SERVER,
-		{
-			env: 'node'
-		},
-		OUTPUT_NODE_SERVER
-	),
-	renderScript(
-		TEMPLATE_SERVER_CLIENT,
-		{
-			env: 'node'
-		},
-		OUTPUT_NODE_SERVER_CLIENT
-	),
-	renderScript(
-		TEMPLATE_CLIENT,
-		{
-			env: 'node'
-		},
-		OUTPUT_NODE_CLIENT
-	),
-	renderScript(
-		TEMPLATE_CLIENT,
-		{
-			env: 'browser'
-		},
-		OUTPUT_BROWSER_CLIENT
-	),
-	renderScript(
-		TEMPLATE_LOG,
-		{
-			env: 'node'
-		},
-		OUTPUT_NODE_LOG
-	),
-	renderScript(
-		TEMPLATE_LOG,
-		{
-			env: 'browser'
-		},
-		OUTPUT_BROWSER_LOG
-	),
-	renderScript(
-		TEMPLATE_CONST,
-		{
-			env: 'node'
-		},
-		OUTPUT_NODE_CONST
-	),
-	renderScript(
-		TEMPLATE_CONST,
-		{
-			env: 'browser'
-		},
-		OUTPUT_BROWSER_CONST
-	),
-	renderScript(
-		TEMPLATE_MESSENGER,
-		{
-			env: 'node'
-		},
-		OUTPUT_NODE_MESSENGER
-	),
-	renderScript(
-		TEMPLATE_MESSENGER,
-		{
-			env: 'browser'
-		},
-		OUTPUT_BROWSER_MESSENGER
-	),
-	renderScript(
-		TEMPLATE_ROUTER,
-		{
-			env: 'node'
-		},
-		OUTPUT_NODE_ROUTER
-	),
-	renderScript(
-		TEMPLATE_ROUTER,
-		{
-			env: 'browser'
-		},
-		OUTPUT_BROWSER_ROUTER
-	),
-	renderScript(
-		TEMPLATE_UUIDV4,
-		{
-			env: 'browser'
-		},
-		OUTPUT_BROWSER_UUIDV4
-	)
-];
+let tasks = [];
+const outs = ['node', 'browser'];
+
+function createTask(file, type){
+	if(Object.prototype.hasOwnProperty.call(file, type)){
+		tasks.push(renderScript(file.tmpl, {env: type}, file[type]));
+	}
+}
+
+files.forEach((file)=>{
+	outs.forEach((output)=>createTask(file, output))
+});
 
 Promise.all(tasks)
 	.then(()=>{

@@ -575,13 +575,6 @@ var notWSClient = (function () {
 	const CLIENT_RECONNECT_TIMEOUT = 5000;
 	const CLIENT_RECONNECT_TIMEOUT_LONG = 30000;
 	const CLIENT_AUTO_RECONNECT = true;
-
-	function noop() {}
-
-	function heartbeat() {
-	  this.isAlive = true;
-	}
-
 	const TOKEN_TTL = 1800;
 	const TOKEN_RENEW_TTL = 300;
 	const MSG_TYPE = {
@@ -590,7 +583,12 @@ var notWSClient = (function () {
 	  EVENT: 'event',
 	  COMMAND: 'command'
 	};
+	const DEV_ENV = 'development';
+	let [, hash] = location.hash.split('#');
+	const ENV_TYPE = hash;
 	var CONST = {
+	  ENV_TYPE,
+	  DEV_ENV,
 	  STATE,
 	  STATE_NAME,
 	  ACTIVITY,
@@ -607,89 +605,25 @@ var notWSClient = (function () {
 	  CLIENT_RECONNECT_TIMEOUT,
 	  CLIENT_RECONNECT_TIMEOUT_LONG,
 	  CLIENT_AUTO_RECONNECT,
-	  heartbeat,
-	  noop,
 	  MSG_TYPE,
 	  TOKEN_TTL,
 	  TOKEN_RENEW_TTL
 	};
 
-	const TZ_OFFSET = new Date().getTimezoneOffset() / 60 * -1;
-	let [, hash] = location.hash.split('#');
-	const ENV_TYPE = hash;
-	const DEV_ENV = 'development';
-
-	const NOOP = () => {}; //Standart pad function.
-
-
-	function pad(n) {
-	  return n < 10 ? '0' + n : n;
-	} //Convert Date object to local ISO string.
-
-
-	function localIsoDate(date) {
-	  date = date || new Date();
-	  let localIsoString = date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds());
-	  return localIsoString;
-	} //Проверка является ли переменная функцией.
-
-
-	let isFunc = function (func) {
+	//Проверка является ли переменная функцией.
+	function isFunc(func) {
 	  return typeof func === 'function';
-	}; //Проверка является ли переменная массивом
-
-
-	let isArray = function (data) {
-	  return typeof data == "object" && data instanceof Array;
-	}; //Функция вывода сообщения в консоль.
-
-
-	let logMsg = function () {
-	  let now = localIsoDate(); // eslint-disable-next-line no-console
-
-	  console.log(`[${now}]: `, ...arguments);
-	}; //Генерация метода вывода сообщений в консоль с указанием префикса.
-
-
-	let genLogMsg = prefix => {
-	  return function () {
-	    let now = localIsoDate(); // eslint-disable-next-line no-console
-
-	    console.log(`[${now}]: ${prefix}::`, ...arguments);
-	  };
-	};
-	/**
-	* Определяет является ли окружение окружением разработки
-	* @returns  {boolean} true если это запущено в окружении разработки
-	**/
-
-
-	function isDev() {
-	  return ENV_TYPE === DEV_ENV;
 	}
 
-	let genLogDebug = prefix => {
-	  if (isDev()) {
-	    return genLogMsg(prefix);
-	  } else {
-	    return NOOP;
-	  }
-	}; //Функция вывода сообщения об ошибке
+	function noop() {}
 
+	function heartbeat() {
+	  this.isAlive = true;
+	}
 
-	let logError = function () {
-	  let now = localIsoDate(); // eslint-disable-next-line no-console
-
-	  console.error(`[${now}]: `, ...arguments);
-	};
-
-	let genLogError = prefix => {
-	  return function () {
-	    let now = localIsoDate(); // eslint-disable-next-line no-console
-
-	    console.error(`[${now}]: ${prefix}::`, ...arguments);
-	  };
-	}; //Проверка строки на JSON(со stackoverflow).
+	function ObjHas(obj, prop) {
+	  return Object.prototype.hasOwnProperty.call(obj, prop);
+	} //Проверка строки на JSON(со stackoverflow).
 	//http://stackoverflow.com/questions/3710204/how-to-check-if-a-string-is-a-valid-json-string-in-javascript-without-using-try
 
 
@@ -711,20 +645,20 @@ var notWSClient = (function () {
 	  return false;
 	};
 
+	function isArray(val) {
+	  return Array.isArray(val);
+	}
+
 	let capitalizeFirstLetter = function (name) {
 	  return name.charAt(0).toUpperCase() + name.slice(1);
 	};
 
-	var LOG = {
-	  TZ_OFFSET,
-	  logMsg,
-	  logError,
-	  genLogMsg,
-	  genLogError,
-	  genLogDebug,
+	var Func = {
 	  isFunc,
 	  isArray,
-	  localIsoDate,
+	  noop,
+	  heartbeat,
+	  ObjHas,
 	  tryParseJSON,
 	  capitalizeFirstLetter
 	};
@@ -735,13 +669,16 @@ var notWSClient = (function () {
 	*/
 
 	class notWSRouter extends EventEmitter {
-	  constructor(options, routes = {}, logger) {
+	  constructor({
+	    name,
+	    routes = {},
+	    logger
+	  }) {
 	    super();
-	    this.options = options;
-	    this.__name = 'notWSRouter';
-	    this.logMsg = logger ? logger.log : LOG.genLogMsg(this.__name);
-	    this.logDebug = logger ? logger.debug : LOG.genLogDebug(this.__name);
-	    this.logError = logger ? logger.error : LOG.genLogError(this.__name);
+	    this.__name = name || 'notWSRouter';
+	    this.logMsg = logger ? logger.log : () => {};
+	    this.logDebug = logger ? logger.debug : () => {};
+	    this.logError = logger ? logger.error : () => {};
 	    this.routes = {
 	      __service: {
 	        updateToken: () => {
@@ -764,15 +701,15 @@ var notWSClient = (function () {
 	    }
 	  }
 	  /**
-	   * Routing action
-	   * @parms {object} messageServiceData  object with fields:
-	                       type - msg type, routes set
-	                       name - action name
-	                       cred - some credentials info
-	     @params {object}  data  payload information from message
-	  	@params {object}  conn  WS Connection
-	     @returns  {Promise} from targeted action or throwing Error if route doesn't exist
-	   */
+	  * Routing action
+	  * @parms {object} messageServiceData  object with fields:
+	                      type - msg type, routes set
+	                      name - action name
+	                      cred - some credentials info
+	    @params {object}  data  payload information from message
+	    @params {object}  conn  WS Connection
+	    @returns  {Promise} from targeted action or throwing Error if route doesn't exist
+	  */
 
 
 	  route({
@@ -780,26 +717,30 @@ var notWSClient = (function () {
 	    name,
 	    cred
 	  }, data, conn) {
-	    if (Object.prototype.hasOwnProperty.call(this.routes, type) && Object.prototype.hasOwnProperty.call(this.routes[type], name)) {
+	    if (Func.ObjHas(this.routes, type) && Func.ObjHas(this.routes[type], name)) {
 	      this.logMsg(conn.ip, type, name);
-	      return this.routes[type][name](data, cred, conn);
+	      return this.routes[type][name]({
+	        data,
+	        cred,
+	        conn
+	      });
 	    }
 
 	    throw new Error(`Route not found ${type}/${name}`);
 	  }
 	  /**
-	   * Adding routes, chainable
-	   * @params {string}  type  name of type
-	   * @params {object}  routes  hash with name => () => {return new Promise} alike workers
-	   * @returns {object} self
-	   */
+	  * Adding routes, chainable
+	  * @params {string}  type  name of type
+	  * @params {object}  routes  hash with name => () => {return new Promise} alike workers
+	  * @returns {object} self
+	  */
 
 
 	  setRoutesForType(type, routes) {
 	    this.validateType(type);
 	    this.validateRoutes(routes);
 
-	    if (Object.prototype.hasOwnProperty.call(this.routes, type)) {
+	    if (Func.ObjHas(this.routes, type)) {
 	      this.routes[type] = Object.assign(this.routes[type], routes);
 	    } else {
 	      this.routes[type] = routes;
@@ -812,9 +753,9 @@ var notWSClient = (function () {
 	    this.validateType(type);
 	    this.validateRoutesList(list);
 
-	    if (Object.prototype.hasOwnProperty.call(this.routes, type)) {
+	    if (Func.ObjHas(this.routes, type)) {
 	      for (let name of list) {
-	        if (Object.prototype.hasOwnProperty.call(this.routes[type], name)) {
+	        if (Func.ObjHas(this.routes[type], name)) {
 	          delete this.routes[type][name];
 	        }
 	      }
@@ -7439,88 +7380,13 @@ var notWSClient = (function () {
 
 	var validator = unwrapExports(validator_1);
 
-	/* global  msCrypto */
-
-	/**
-	* Version of https://github.com/kelektiv/node-uuid
-	* Edited by Roman Burunkov, Aleksandr Repin
-	**/
-
-	/**
-	 * Convert array of 16 byte values to UUID string format of the form:
-	 * XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
-	 */
-	var byteToHex = [];
-
-	for (var i = 0; i < 256; ++i) {
-	  byteToHex[i] = (i + 0x100).toString(16).substr(1);
-	}
-
-	function bytesToUuid(buf, offset) {
-	  var i = offset || 0;
-	  var bth = byteToHex;
-	  return bth[buf[i++]] + bth[buf[i++]] + bth[buf[i++]] + bth[buf[i++]] + '-' + bth[buf[i++]] + bth[buf[i++]] + '-' + bth[buf[i++]] + bth[buf[i++]] + '-' + bth[buf[i++]] + bth[buf[i++]] + '-' + bth[buf[i++]] + bth[buf[i++]] + bth[buf[i++]] + bth[buf[i++]] + bth[buf[i++]] + bth[buf[i++]];
-	} // Unique ID creation requires a high quality random # generator.  In the
-	// browser this is a little complicated due to unknown quality of Math.random()
-	// and inconsistent support for the `crypto` API.  We do the best we can via
-	// feature-detection
-	// getRandomValues needs to be invoked in a context where "this" is a Crypto implementation.
-
-
-	var getRandomValues = typeof crypto != 'undefined' && crypto.getRandomValues.bind(crypto) || typeof msCrypto != 'undefined' && msCrypto.getRandomValues.bind(msCrypto);
-	var rng;
-
-	if (getRandomValues) {
-	  // WHATWG crypto RNG - http://wiki.whatwg.org/wiki/Crypto
-	  var rnds8 = new Uint8Array(16); // eslint-disable-line no-undef
-
-	  rng = function () {
-	    getRandomValues(rnds8);
-	    return rnds8;
-	  };
-	} else {
-	  // Math.random()-based (RNG)
-	  //
-	  // If all else fails, use Math.random().  It's fast, but is of unspecified
-	  // quality.
-	  var rnds = new Array(16);
-
-	  rng = function () {
-	    for (var i = 0, r; i < 16; i++) {
-	      if ((i & 0x03) === 0) r = Math.random() * 0x100000000;
-	      rnds[i] = r >>> ((i & 0x03) << 3) & 0xff;
-	    }
-
-	    return rnds;
-	  };
-	}
-
-	function uuidv4(options, buf, offset) {
-	  var i = buf && offset || 0;
-
-	  if (typeof options == 'string') {
-	    buf = options === 'binary' ? new Array(16) : null;
-	    options = null;
-	  }
-
-	  options = options || {};
-	  var rnds = options.random || (options.rng || rng)(); // Per 4.4, set bits for version and `clock_seq_hi_and_reserved`
-
-	  rnds[6] = rnds[6] & 0x0f | 0x40;
-	  rnds[8] = rnds[8] & 0x3f | 0x80; // Copy bytes to buffer, if provided
-
-	  if (buf) {
-	    for (var ii = 0; ii < 16; ++ii) {
-	      buf[i + ii] = rnds[ii];
-	    }
-	  }
-
-	  return buf || bytesToUuid(rnds);
-	}
-
+	const {
+	  v4: uuidv4
+	} = require('uuid');
 	/**
 	 * set of default options
 	 */
+
 
 	const DEFAULT_OPTIONS = {
 	  validateType: true,
@@ -7534,10 +7400,10 @@ var notWSClient = (function () {
 	  validators: {//additional validators for validate method
 
 	    /**
-	      credentials(credentials){
-	        return (credentials.password === 'password') && (credentials.login === 'login');
-	      }
-	      */
+	    credentials(credentials){
+	      return (credentials.password === 'password') && (credentials.login === 'login');
+	    }
+	    */
 	  },
 	  types: {
 	    'typeOfMessage': ['list', 'of', 'name\'s', 'of', 'actions'],
@@ -7565,12 +7431,12 @@ var notWSClient = (function () {
 	 * understanding message inner structure
 	 */
 
-	class notWSMessage extends EventEmitter {
+	class notWSMessenger extends EventEmitter {
 	  constructor(options = {}) {
 	    super();
 	    this.options = Object.assign({}, DEFAULT_OPTIONS, options);
 
-	    if (Object.prototype.hasOwnProperty.call(this.options.types, CONST.MSG_TYPE.REQUEST) && !Object.prototype.hasOwnProperty.call(this.options.types, CONST.MSG_TYPE.RESPONSE)) {
+	    if (Func.ObjHas(this.options.types, CONST.MSG_TYPE.REQUEST) && !Func.ObjHas(this.options.types, CONST.MSG_TYPE.RESPONSE)) {
 	      this.options.types[CONST.MSG_TYPE.RESPONSE] = this.options.types[CONST.MSG_TYPE.REQUEST];
 	    }
 
@@ -7625,9 +7491,9 @@ var notWSClient = (function () {
 	    return msg.error;
 	  }
 	  /**
-	    *
-	    *
-	    */
+	   *
+	   *
+	   */
 
 
 	  pack(payload, serviceData, error) {
@@ -7683,7 +7549,7 @@ var notWSClient = (function () {
 	  }
 
 	  validateTypeAndName(type, name) {
-	    if (this.options.types && Object.prototype.hasOwnProperty.call(this.options.types, type)) {
+	    if (this.options.types && Func.ObjHas(this.options.types, type)) {
 	      return this.options.types[type].indexOf(name) > -1;
 	    }
 
@@ -7738,11 +7604,11 @@ var notWSClient = (function () {
 	  }
 
 	  enableRoute(route, name) {
-	    if (!Object.prototype.hasOwnProperty.call(this.options, 'types')) {
+	    if (!Func.ObjHas(this.options, 'types')) {
 	      this.options.types = {};
 	    }
 
-	    if (!Object.prototype.hasOwnProperty.call(this.options.types, route)) {
+	    if (!Func.ObjHas(this.options.types, route)) {
 	      this.options.types[route] = [];
 	    }
 
@@ -7754,11 +7620,11 @@ var notWSClient = (function () {
 	  }
 
 	  disableRoute(route, name) {
-	    if (!Object.prototype.hasOwnProperty.call(this.options, 'types')) {
+	    if (!Func.ObjHas(this.options, 'types')) {
 	      return this;
 	    }
 
-	    if (!Object.prototype.hasOwnProperty.call(this.options.types, route)) {
+	    if (!Func.ObjHas(this.options.types, route)) {
 	      return this;
 	    }
 
@@ -7772,60 +7638,64 @@ var notWSClient = (function () {
 	}
 
 	//imports
-	//options:
-	// - host       - Адрес сервиса
-	// - port       - Порт сервиса
-	// - doLogout   - Метод выхода из системы.
-	// - fcCallback - коллбэк вызываемый при первом подключении
+	const SYMBOL_ACTIVITY$1 = Symbol('activity');
+	const SYMBOL_STATE$1 = Symbol('state');
+	const MAX_HISTORY_DEPTH = 40;
+	const DEFAULT_OPTIONS$1 = {
+	  secure: true,
+	  reconnect: true,
+	  ping: true
+	};
 
-	class notWSClient extends EventEmitter {
-	  constructor({
-	    options,
-	    messenger,
-	    router
-	  }) {
+	class notWSConnection extends EventEmitter {
+	  constructor(options) {
 	    super();
-	    let logger = options.logger; //Основные параметры
+	    this.options = Object.assign({}, DEFAULT_OPTIONS$1, options);
 
-	    this.options = options; //Параметры клиентского подключения
+	    if (this.options.ws) {
+	      this.ws = options.ws;
+	      this.isAlive = true; //результат пинг запросов
 
-	    this.__name = options.name ? options.name : 'WSClient'; //Подключение к WS
+	      delete options.ws;
+	    } else {
+	      this.isAlive = false; //результат пинг запросов
 
-	    this.ws = null; //Подключение к websocket серверу.
+	      this.ws = null; //Подключение к websocket серверу.
+	    } //if was terminated
 
+
+	    this.isTerminated = false;
+	    this.isReconnecting = false;
+	    this.closing = false;
+	    this.heartbeatTimeout = null;
+	    this.connectInterval = null;
 	    this.connCount = 0; //Количество неудачных попыток подключения к websocket серверу.
 
 	    this.connCountMax = 10; //Количество попыток по превышении которого считаем что соединение с серверов разорвано.
 
 	    this.errConnMsg = null; //Идентификатор сообщения об ошибке подключения к вебсокет серверу.
 
-	    this.firstConn = true;
-	    this.messenger = messenger ? messenger : new notWSMessage(options.messenger ? options.messenger : {});
-	    this.router = router ? router : new notWSRouter(options.router ? options.router : {}, options.routes ? options.routes : {});
-	    this.router.on('updateToken', this.renewToken.bind(this)); //jwt
+	    this.firstConn = true; //connection state and current activity
 
-	    this.jwtToken = null; //Токен авторизации.
+	    if (this.options.state === 'online') {
+	      this[SYMBOL_STATE$1] = CONST.STATE.CONNECTED;
+	    } else {
+	      this[SYMBOL_STATE$1] = CONST.STATE.NOT_CONNECTED;
+	    }
 
-	    this.jwtExpire = null; //Время до истечения токена.
-
-	    this.jwtDate = null; //Дата создания токена.
-	    //logging
-
-	    this.logMsg = logger ? logger.log : LOG.genLogMsg(this.__name);
-	    this.logDebug = logger ? logger.debug : LOG.genLogDebug(this.__name);
-	    this.logError = logger ? logger.error : LOG.genLogError(this.__name); //requests processing
-
-	    this.requests = []; //Список текущих запросов к API.
-
-	    this.reqTimeout = 15000; //Таймаут для выполнения запросов.
-
-	    this.reqChkTimer = null; //Таймер для проверки таймаутов выполнения запросов.
-
-	    this.reqChkStep = 2000; //Таймер для проверки таймаутов выполнения запросов.
-
+	    this[SYMBOL_ACTIVITY$1] = CONST.ACTIVITY.IDLE;
 	    this.bindEnvEvents();
-	    this.connect();
+	    this.bindSocketEvents(); //message history
+
+	    this.history = [];
+	    return this;
 	  }
+
+	  getSocket() {
+	    return this.ws;
+	  }
+
+	  bindSocketEvents() {}
 
 	  bindEnvEvents() {
 	    window.onunload = this.disconnect.bind(this);
@@ -7834,114 +7704,33 @@ var notWSClient = (function () {
 
 
 	  disconnect() {
-	    this.logMsg(`Отключение от сервера...`);
+	    this.emit('diconnecting');
 
 	    if (this.ws) {
 	      //заменяем метод для onclose на пустую функцию.
-	      this.ws.onclose = CONST.noop; //закрываем подключение.
+	      this.ws.onclose = Func.noop; //закрываем подключение.
 
-	      this.ws.close();
-	      this.stopReqChckTimer();
+	      this.ws.close && this.ws.close();
+	      this.terminate();
 	      this.emit('disconnected');
-	    } else {
-	      //eslint-disable-next-line no-console
-	      console.trace();
-	    }
-	  } //Получение токена.
-	  //Возможно реализовать разными способами, поэтому выделено в отдельный метод.
-
-
-	  getToken(renew = false) {
-	    let token = localStorage.getItem('token');
-
-	    if (typeof token !== 'undefined' && token !== 'undefined' && token && !renew) {
-	      return Promise.resolve(token);
-	    } else {
-	      if (LOG.isFunc(this.options.getToken)) {
-	        return this.options.getToken();
-	      } else {
-	        return Promise.reject();
-	      }
 	    }
 	  }
 
-	  async renewToken() {
-	    try {
-	      let token = await this.getToken(true);
-
-	      if (token) {
-	        this.saveToken(token);
-	      } else {
-	        throw new Error('Token isn\'t renewed');
-	      }
-	    } catch (e) {
-	      this.logError(e);
+	  terminate() {
+	    if (this.connectInterval) {
+	      clearInterval(this.connectInterval);
 	    }
-	  }
 
-	  saveToken(token) {
-	    localStorage.setItem('token', token);
-	    this.jwtToken = token;
-	    this.messenger.setCredentials(token);
-	    this.emit('tokenUpdated', token);
-	  } //Обработчик сообщений пришедших от сервера.
-	  //msg - это messageEvent пришедший по WS, соответственно данные лежат в msg.data.
+	    if (this.ws) {
+	      this.activity = CONST.ACTIVITY.TERMINATING;
+	      this.ws.terminate && this.ws.terminate();
+	    }
 
+	    this.isTerminated = true;
+	    this.ws = null;
 
-	  onMessage(input) {
-	    try {
-	      //this.logDebug(rawMsg);
-	      //проверяем не "понг" ли это, если так - выходим
-	      let rawMsg = input.data;
-
-	      if (this.checkPingMsg(rawMsg)) {
-	        return;
-	      }
-
-	      let data = LOG.tryParseJSON(rawMsg); //Не удалось распарсить ответ от сервера как JSON
-
-	      if (!data) {
-	        this.logMsg(`получено сообщение от сервера:${rawMsg}`);
-	        return;
-	      }
-
-	      this.messenger.validate(data);
-	      let msg = this.messenger.unpack(data); //general event
-
-	      this.emit('message', msg); //specific event
-
-	      this.emit(msg.service.type + ':' + msg.service.name, msg.service, msg.payload, this.ws);
-
-	      if (msg.service.type === CONST.MSG_TYPE.RESPONSE) {
-	        let request = this.fullfillRequest(msg.service.id);
-
-	        if (request !== null) {
-	          request.cb(msg);
-	        }
-	      } else if (msg.service.type === CONST.MSG_TYPE.EVENT) {
-	        //old event type
-	        //this.emit('remote.' + msg.service.name, msg.service, msg.payload, this.ws);
-	        this.router.route(msg.service, msg.payload, this.ws).catch(e => {
-	          this.logError(e);
-	        });
-	      } else {
-	        this.router.route(msg.service, msg.payload, this.ws).then(responseData => {
-	          this.respond(responseData, {
-	            id: msg.service.id,
-	            type: CONST.MSG_TYPE.RESPONSE,
-	            name: msg.service.name
-	          });
-	        }).catch(e => {
-	          this.logError(e);
-	          this.respond({}, {
-	            id: msg.service.id,
-	            type: CONST.MSG_TYPE.RESPONSE,
-	            name: msg.service.name
-	          }, e);
-	        });
-	      }
-	    } catch (e) {
-	      this.logError(e, e.details);
+	    if (this.state !== CONST.STATE.NOT_CONNECTED) {
+	      this.state = CONST.STATE.NOT_CONNECTED;
 	    }
 	  } //Подключение к websocket сервису.
 
@@ -7953,66 +7742,19 @@ var notWSClient = (function () {
 	      }
 
 	      this.isAlive = true;
-	      this.logMsg(`Подключение к WebSocket серверу...`); //Счётчик колиества попыток подключения:
+	      this.emit('connecting'); //Счётчик колиества попыток подключения:
 
-	      this.connCount++; //Загружаем информацию о токене и пытаемся подключиться к вебсокет сервису.
-
-	      if (this.isSecure()) {
-	        this.saveToken((await this.getToken()));
-	      }
+	      this.connCount++; //пытаемся подключиться к вебсокет сервису.
 
 	      let connURI = this.getConnectURI();
-	      this.logMsg('Connecting to: ', connURI);
+	      this.emit('connectURI', connURI);
 	      this.ws = new WebSocket(connURI);
 	      this.ws.onopen = this.onOpen.bind(this);
 	      this.ws.error = this.onError.bind(this);
 	    } catch (e) {
-	      //eslint-disable-next-line no-console
-	      this.logError(e);
+	      this.emit('error', e);
 	      this.scheduleReconnect();
 	    }
-	  }
-
-	  onOpen() {
-	    this.emit('connected');
-	    this.logMsg('Установлено подключение к WebSocket серверу.'); //Сбрасываем счётчик количества попыток подключения и данные об ошибках.
-
-	    this.connCount = 0;
-	    this.isAlive = true;
-	    clearInterval(this.connectTimeout);
-	    this.connectTimeout = false;
-	    this.errConnMsg = null;
-	    this.ws.onmessage = this.onMessage.bind(this);
-	    this.ws.onclose = this.onClose.bind(this); //Запускаем таймер проверки списка запросов.
-
-	    this.startReqChckTimer();
-	    this.initPing();
-	    this.emit('ready');
-	  }
-
-	  onError(err) {
-	    this.emit('disconnected');
-
-	    if (this.connectTimeout) {
-	      clearInterval(this.connectTimeout);
-	      this.connectTimeout = false;
-	    }
-
-	    this.logError(err);
-	    this.scheduleReconnect();
-	  } //Обработчик закрытия подключения.
-
-
-	  onClose(event) {
-	    this.emit('disconnected');
-	    let reason = `${event.code}::` + CONST.mapWsCloseCodes(event);
-	    this.logMsg(`подключение разорвано: ${reason}`);
-
-	    if (this.isAutoReconnect()) {
-	      this.scheduleReconnect();
-	    }
-
-	    this.stopReqChckTimer();
 	  }
 
 	  getConnectURI() {
@@ -8041,6 +7783,95 @@ var notWSClient = (function () {
 	    }
 	  }
 
+	  setToken(token) {
+	    this.jwtToken = token;
+	  }
+
+	  onOpen() {
+	    this.emit('connected'); //Сбрасываем счётчик количества попыток подключения и данные об ошибках.
+
+	    this.connCount = 0;
+	    this.isAlive = true;
+	    clearInterval(this.connectInterval);
+	    this.connectInterval = false;
+	    this.errConnMsg = null;
+	    this.ws.onmessage = this.onMessage.bind(this);
+	    this.ws.onclose = this.onClose.bind(this);
+	    this.initPing();
+	    this.emit('ready');
+	  } //Обработчик сообщений пришедших от сервера.
+	  //msg - это messageEvent пришедший по WS, соответственно данные лежат в msg.data.
+
+
+	  onMessage(input) {
+	    try {
+	      //проверяем не "понг" ли это, если так - выходим
+	      let rawMsg = input.data;
+
+	      if (this.checkPingMsg(rawMsg)) {
+	        return;
+	      }
+
+	      let data = Func.tryParseJSON(rawMsg); //Не удалось распарсить ответ от сервера как JSON
+
+	      if (!data) {
+	        this.emit('messageInWronFormat', rawMsg);
+	        return;
+	      }
+
+	      this.emit('message', data);
+	    } catch (e) {
+	      this.emit('error', e);
+	    }
+	  }
+
+	  onError(err) {
+	    this.emit('disconnected');
+
+	    if (this.connectInterval) {
+	      clearInterval(this.connectInterval);
+	      this.connectInterval = false;
+	    }
+
+	    if (this.activity === CONST.ACTIVITY.TERMINATING) {
+	      this.state = CONST.STATE.NOT_CONNECTED;
+	    } else {
+	      this.state = CONST.STATE.ERRORED;
+	    }
+
+	    this.emit('error', err);
+	  } //Обработчик закрытия подключения.
+
+
+	  onClose(event) {
+	    this.emit('disconnected');
+
+	    if (typeof event.code !== 'undefined') {
+	      let reason = `${event.code}::` + CONST.mapWsCloseCodes(event);
+	      this.emit('close', reason);
+	    } else {
+	      if (isNaN(event)) {
+	        this.emit('close', event);
+	      } else {
+	        this.emit('terminated', CONST.mapWsCloseCodes(event));
+	      }
+	    }
+
+	    if (this.activity === CONST.ACTIVITY.CLOSING) {
+	      this.state = CONST.STATE.NOT_CONNECTED;
+	    } else {
+	      this.state = CONST.STATE.ERRORED;
+	    }
+
+	    if (this.isAutoReconnect()) {
+	      this.scheduleReconnect();
+	    }
+	  }
+
+	  suicide() {
+	    this.emit('errored', this);
+	  }
+
 	  getReconnectTimeout() {
 	    if (this.connCount >= this.connCountMax) {
 	      return CONST.CLIENT_RECONNECT_TIMEOUT_LONG;
@@ -8051,8 +7882,13 @@ var notWSClient = (function () {
 
 	  scheduleReconnect() {
 	    let timeout = this.getReconnectTimeout();
-	    this.logMsg(`Планируем переподключение каждые ${timeout}мс`);
-	    this.connectTimeout = setInterval(() => {
+	    this.emit('reconnectioningEvery', timeout);
+
+	    if (this.connectInterval) {
+	      clearInterval(this.connectInterval);
+	    }
+
+	    this.connectInterval = setInterval(() => {
 	      if (this.isAlive === false) {
 	        if (this.ws.readyState === this.ws.CLOSED) {
 	          this.connect();
@@ -8060,9 +7896,18 @@ var notWSClient = (function () {
 	      }
 	    }, timeout);
 	  }
+
+	  reconnect() {
+	    if ([CONST.ACTIVITY.CONNECTING].indexOf(this.activity) > -1) {
+	      this.emit('concurentActivity', CONST.ACTIVITY[this.activity]);
+	      return;
+	    } else {
+	      this.scheduleReconnect();
+	    }
+	  }
 	  /**
-	   *  Требуется аутентификация или нет
-	   */
+	  *  Требуется аутентификация или нет
+	  */
 
 
 	  isSecure() {
@@ -8070,24 +7915,43 @@ var notWSClient = (function () {
 	  }
 
 	  isAutoReconnect() {
-	    if (typeof this.options.autoReconnect !== 'undefined') {
-	      return this.options.autoReconnect;
+	    if (typeof this.options.reconnect !== 'undefined') {
+	      return this.options.reconnect;
 	    } else {
 	      return CONST.CLIENT_AUTO_RECONNECT;
 	    }
 	  }
+	  /**
+	   *  Returns true if user connected, if secure===true,
+	   *  then client should be authentificated too
+	   *  @params {boolean} secure      if user should be connected and authenticated
+	   */
 
-	  respond(resp, service = {}, error) {
-	    if (resp && typeof resp === 'object' && resp !== null) {
-	      let msg = this.options.messenger.pack(resp, service, error);
-	      return this.sendMsg(msg);
+
+	  isConnected(secure = true) {
+	    if (this.ws && this.isAlive) {
+	      if (secure) {
+	        return this.isConnectionSecure();
+	      } else {
+	        return true;
+	      }
 	    } else {
-	      return true;
+	      return false;
 	    }
 	  }
 
-	  isConnected() {
-	    return this.ws && this.isAlive;
+	  isConnectionSecure() {
+	    let state = CONST.STATE.CONNECTED;
+
+	    if (this.isSecure()) {
+	      state = CONST.STATE.AUTHORIZED;
+	    }
+
+	    return this.state === state && this.ws.readyState === 1; // 1- OPEN
+	  }
+
+	  isDead() {
+	    return this.isTerminated;
 	  }
 
 	  initPing() {
@@ -8100,23 +7964,41 @@ var notWSClient = (function () {
 	      this.intPing = setInterval(this.sendPing.bind(this), this.options.pingTimeout || CONST.PING_TIMEOUT);
 	    }
 	  }
+	  /**
+	  * If not connected, reconnects, else sets connection isNotAlive and sends ping
+	  */
+
 
 	  sendPing() {
-	    //this.logDebug('out ping', this.isAlive);
 	    if (this.isAlive === false) {
-	      this.logMsg('Connection is not alive (no pong). Terminating');
+	      this.emit('noPong');
 	      this.disconnect();
 	      this.scheduleReconnect();
 	      return;
 	    }
 
 	    this.isAlive = false;
-	    this.ws.send('ping');
+	    this.ping();
 	  }
+	  /**
+	  * Ping connection
+	  */
+
+
+	  ping() {
+	    if (this.ws) {
+	      this.ws.send('ping');
+	    }
+	  }
+	  /**
+	  * If message is plain text 'pong', then it sets connections as isAlive
+	  * @params {string}  msg   incoming message
+	  * @returns {boolean}  if it 'pong' message
+	  **/
+
 
 	  checkPingMsg(msg) {
 	    if (msg === 'pong') {
-	      //this.logDebug('in pong');
 	      this.isAlive = true;
 	      return true;
 	    }
@@ -8124,22 +8006,20 @@ var notWSClient = (function () {
 	    return false;
 	  }
 	  /**
-	   * Отправка сообщения
-	   * @param  {object|string} данные в виде
-	   *                         - строки, будут обернуты в соотвествии со спецификацией
-	   *                         - объекта, будут переданы без изменений
-	   * @return {Promise} resolve - удачно, reject - сбой
-	   */
+	  * Отправка сообщения
+	  * @param  {object|string} данные в виде
+	  *                         - строки, будут обернуты в соотвествии со спецификацией
+	  *                         - объекта, будут переданы без изменений
+	  * @return {Promise} resolve - удачно, reject - сбой
+	  */
 
 
-	  sendMsg(data) {
+	  send(data, secure) {
 	    //Проверяем что клиент подключен
 	    return new Promise((resolve, reject) => {
 	      try {
-	        if (this.isConnected()) {
+	        if (this.isConnected(secure)) {
 	          //Пытаемся отправить сообщение клиенту.
-	          //eslint-disable-next-line no-console
-	          console.log('send message', data);
 	          this.ws.send(JSON.stringify(data), err => {
 	            if (err) {
 	              this.state = CONST.STATE.ERRORED;
@@ -8149,8 +8029,8 @@ var notWSClient = (function () {
 	            }
 	          });
 	        } else {
-	          this.logDebug('Failed to send message to ws client, connection is in state: ' + CONST.STATE_NAME[this.state] + '!'); //this.addToHistory(data);
-
+	          this.emit('messageNotSent', CONST.STATE_NAME[this.state]);
+	          this.addToHistory(data);
 	          resolve();
 	        }
 	      } catch (e) {
@@ -8159,24 +8039,422 @@ var notWSClient = (function () {
 	      }
 	    });
 	  }
+
+	  addToHistory(data) {
+	    this.emit('addToHistory', data);
+	    this.history.push(data);
+
+	    if (this.history.length > MAX_HISTORY_DEPTH) {
+	      this.history.shift();
+	    }
+	  }
+
+	  sendAllFromHistory() {
+	    while (this.history.length) {
+	      let msg = this.history.shift(); //sending out but only in secure manner, all messages for not auth users will be dropped
+
+	      this.send(msg, true).catch(this.onError.bind(this));
+	    }
+	  }
 	  /**
-	  *	Отправка данных определенного типа и названия
-	  *	@param {string}	type	тип данных
-	  *	@param {string}	name	название
-	  *	@param {object}	payload	данные
-	  *	@returns	{Promise}
+	  * Finite states machine
+	  */
+
+
+	  get state() {
+	    return this[SYMBOL_STATE$1];
+	  }
+
+	  set state(state = CONST.STATE.NOT_CONNECTED) {
+	    if (Object.values(CONST.STATE).indexOf(state) > -1) {
+	      this.emit('stateChange', state, CONST.STATE_NAME[state]); //для каждого варианта, есть только ограниченное кол-во вариантов перехода
+	      //из "нет соединения" в "авторизован" не прыгнуть
+
+	      switch (this[SYMBOL_STATE$1]) {
+	        //можем только подключиться или вылететь с ошибкой подключения
+	        case CONST.STATE.NOT_CONNECTED:
+	          if ([CONST.STATE.CONNECTED, CONST.STATE.ERRORED].indexOf(state) > -1) {
+	            this[SYMBOL_STATE$1] = state;
+	            this.activity = CONST.ACTIVITY.IDLE;
+	          } else {
+	            throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE$1]] + ' -> ' + CONST.STATE_NAME[state]);
+	          }
+
+	          break;
+	        //можем повиснуть, авторизоваться вылететь с ошибкой
+
+	        case CONST.STATE.CONNECTED:
+	          if ([CONST.STATE.AUTHORIZED, CONST.STATE.NO_PING, CONST.STATE.ERRORED, CONST.STATE.NOT_CONNECTED].indexOf(state) > -1) {
+	            this[SYMBOL_STATE$1] = state;
+	            this.activity = CONST.ACTIVITY.IDLE;
+	          } else {
+	            throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE$1]] + ' -> ' + CONST.STATE_NAME[state]);
+	          }
+
+	          if (state === CONST.STATE.AUTHORIZED) {
+	            this.emit('authorized');
+	          }
+
+	          break;
+	        //можем потерять авторизацию, но продолжить висеть на линии
+	        //повиснуть
+	        //вылететь с ошибкой связи
+
+	        case CONST.STATE.AUTHORIZED:
+	          if ([CONST.STATE.CONNECTED, CONST.STATE.NO_PING, CONST.STATE.ERRORED, CONST.STATE.NOT_CONNECTED].indexOf(state) > -1) {
+	            this[SYMBOL_STATE$1] = state;
+	            this.activity = CONST.ACTIVITY.IDLE;
+	          } else {
+	            throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE$1]] + ' -> ' + CONST.STATE_NAME[state]);
+	          }
+
+	          break;
+	        ////из остояний разрыва связи, можно уйти только в "не подключен"
+	        //можем только отключиться
+
+	        case CONST.STATE.NO_PING:
+	          if ([CONST.STATE.NOT_CONNECTED].indexOf(state) > -1) {
+	            this[SYMBOL_STATE$1] = state;
+	            this.activity = CONST.ACTIVITY.IDLE;
+	          } else {
+	            throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE$1]] + ' -> ' + CONST.STATE_NAME[state]);
+	          }
+
+	          break;
+	        //можем только отключиться
+
+	        case CONST.STATE.ERRORED:
+	          if ([CONST.STATE.NOT_CONNECTED, CONST.STATE.ERRORED].indexOf(state) > -1) {
+	            this[SYMBOL_STATE$1] = state;
+	            this.activity = CONST.ACTIVITY.IDLE;
+	          } else {
+	            throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE$1]] + ' -> ' + CONST.STATE_NAME[state]);
+	          }
+
+	          break;
+	      }
+
+	      if ([CONST.STATE.ERRORED, CONST.STATE.NO_PING].indexOf(state) > -1) {
+	        if (CONST.STATE.ERRORED === state) {
+	          this.emit('errored');
+	        } else {
+	          this.emit('noPing');
+	        }
+
+	        this.disconnectTimeout = setTimeout(this.disconnect.bind(this), 100);
+	      } //если идём на обрыв, то переподключение не запускаем
+
+
+	      if (CONST.STATE.NOT_CONNECTED === state && !this.isDead()) {
+	        this.emit('beforeReconnect');
+	        this.reconnect();
+	      }
+
+	      return true;
+	    } else {
+	      throw new Error('set: Unknown notWSServerClient state: ' + state);
+	    }
+	  }
+
+	  get activity() {
+	    return this[SYMBOL_ACTIVITY$1];
+	  } //
+
+	  /*
+	  IDLE: 0,
+	  //идёт подключение
+	  CONNECTING: 1,
+	  //закрытие соединения
+	  CLOSING: 2,
+	  //разрыв соединения
+	  TERMINATING: 3,
+	  //авторизация по токену
+	  AUTHORIZING: 4
+	  */
+
+
+	  set activity(activity = CONST.ACTIVITY.IDLE) {
+	    if (Object.values(CONST.ACTIVITY).indexOf(activity) > -1) {
+	      this.emit('changeActivity', activity, CONST.ACTIVITY_NAME[activity]); //для каждого варианта, есть только ограниченное кол-во вариантов перехода
+	      //из "нет соединения" в "авторизован" не прыгнуть
+
+	      switch (this[SYMBOL_ACTIVITY$1]) {
+	        //можем только подключиться
+	        case CONST.ACTIVITY.IDLE:
+	          if ([CONST.ACTIVITY.CONNECTING, CONST.ACTIVITY.CLOSING, CONST.ACTIVITY.TERMINATING, CONST.ACTIVITY.AUTHORIZING].indexOf(activity) > -1) {
+	            this[SYMBOL_ACTIVITY$1] = activity;
+	          }
+
+	          break;
+
+	        case CONST.ACTIVITY.CONNECTING:
+	        case CONST.ACTIVITY.CLOSING:
+	        case CONST.ACTIVITY.TERMINATING:
+	        case CONST.ACTIVITY.AUTHORIZING:
+	          if ([CONST.ACTIVITY.IDLE].indexOf(activity) > -1) {
+	            this[SYMBOL_ACTIVITY$1] = activity;
+	          }
+
+	          break;
+	      }
+
+	      return true;
+	    } else {
+	      throw new Error('set: Unknown notWSServerClient activity: ' + activity);
+	    }
+	  }
+
+	} //env dep export
+
+	//imports
+
+	/**
+	*
+	* Client - main function is to connect and handle requests from/to server.
+	*
+	* Options
+	* @params {string}          name              - client name, optional. default: WSCLient
+	* @params {object}          connection        - object describing server and behaviour of this client
+	*         {string}            host            - server address
+	*         {string}            port            - server port
+	*         {string}            path            - path on server
+	*         {string}            protocol        - connection protocol, preffered over 'ssl' option
+	*         {boolean}           ssl             - user ssl encryption for connection
+	*         {boolean}           secure          - auth needed
+	*         {boolean}           reconnect       - reconnect if disconnected
+	*         {boolean}           ping            - ping server to indentify connection problems ASAP
+	* @params {function}        getToken          - should return token for auth on server
+	* @params {notWSMessenger}  messenger         - message handler
+	* @params {notWSRouter}     router            - request handler
+	* @params {object}          logger            - log interface {function:log, function:debug, function:error}
+	*
+	**/
+
+	const TIME_OFFSET_REQUEST_INTERVAL = 5 * 60 * 1000;
+
+	class notWSClient extends EventEmitter {
+	  constructor({
+	    name,
+	    connection,
+	    getToken,
+	    messenger,
+	    router,
+	    logger
+	  }) {
+	    if (!router || !(router instanceof notWSRouter)) {
+	      throw new Error('Router is not set or is not instance of notWSRouter');
+	    }
+
+	    if (!messenger || !(messenger instanceof notWSMessenger)) {
+	      throw new Error('Messenger is not set or is not instance of notWSMessenger');
+	    }
+
+	    super(); //Основные параметры
+
+	    this.__name = name || 'WSClient'; //jwt
+
+	    this.jwtToken = null; //Токен авторизации.
+
+	    this.jwtExpire = null; //Время до истечения токена.
+
+	    this.jwtDate = null; //Дата создания токена.
+	    //Подключение к WS
+
+	    this.initConnection(connection);
+	    this.tokenGetter = getToken;
+	    this.messenger = messenger;
+	    this.router = router;
+	    this.router.on('updateToken', this.renewToken.bind(this)); //logging
+
+	    this.logMsg = logger ? logger.log : () => {};
+	    this.logDebug = logger ? logger.debug : () => {};
+	    this.logError = logger ? logger.error : () => {}; //requests processing
+
+	    this.requests = []; //Список текущих запросов к API.
+
+	    this.reqTimeout = 15000; //Таймаут для выполнения запросов.
+
+	    this.reqChkTimer = null; //Таймер для проверки таймаутов выполнения запросов.
+
+	    this.reqChkStep = 2000; //Таймер для проверки таймаутов выполнения запросов.
+	    //time off set from server time
+
+	    this._timeOffset = 0;
+	    this.getTimeOffsetInt = null; //message history if in online
+
+	    this.history = [];
+	    this.connect();
+	  }
+
+	  initConnection(connection) {
+	    this.connection = new notWSConnection(connection);
+	    this.connection.on('disconnected', () => {
+	      this.logMsg('dicconnected');
+	      this.stopReqChckTimer();
+	      this.emit('close', this);
+	    });
+	    this.connection.on('connected', () => {
+	      this.logMsg('connected'); //Запускаем таймер проверки списка запросов.
+
+	      this.startReqChckTimer();
+	      this.emit('open', this);
+	    });
+	    this.connection.on('connectURI', e => {
+	      this.logMsg('connectURI', e);
+	    });
+	    this.connection.on('close', e => {
+	      this.logMsg('close', e);
+	    });
+	    this.connection.on('error', e => {
+	      this.logError(e);
+	    });
+	    this.connection.on('message', this.processMessage.bind(this));
+	  }
+
+	  async connect() {
+	    try {
+	      //если нужна аутентификация
+	      if (this.connection.isSecure()) {
+	        //получаем и сохраняем токен токен
+	        this.saveToken((await this.getToken()));
+	      } //подключаемся
+
+
+	      this.connection.connect();
+	    } catch (e) {
+	      this.logError(e);
+	    }
+	  } //Получение токена.
+	  //Возможно реализовать разными способами, поэтому выделено в отдельный метод.
+
+
+	  getToken(renew = false) {
+	    let token = localStorage.getItem('token');
+
+	    if (typeof token !== 'undefined' && token !== 'undefined' && token && !renew) {
+	      return Promise.resolve(token);
+	    } else {
+	      if (Func.isFunc(this.tokenGetter)) {
+	        return this.tokenGetter();
+	      } else {
+	        return Promise.reject();
+	      }
+	    }
+	  }
+
+	  async renewToken() {
+	    try {
+	      let token = await this.getToken(true);
+
+	      if (token) {
+	        this.saveToken(token);
+	      } else {
+	        throw new Error('Token isn\'t renewed');
+	      }
+	    } catch (e) {
+	      this.logError(e);
+	    }
+	  }
+
+	  saveToken(token) {
+	    localStorage.setItem('token', token);
+	    this.jwtToken = token;
+	    this.messenger.setCredentials(token);
+	    this.connection.setToken(token);
+	    this.emit('tokenUpdated', token);
+	  } //Обработчик сообщений пришедших от сервера.
+	  //data - JSON
+
+
+	  processMessage(data) {
+	    try {
+	      this.messenger.validate(data);
+	      let msg = this.messenger.unpack(data); //general event
+
+	      this.emit('message', msg, this); //specific event
+
+	      this.emit(msg.service.type + ':' + msg.service.name, msg.service, msg.payload, this.connection.getSocket()); //routing
+
+	      this.selectRoute(msg);
+	    } catch (e) {
+	      this.logError(e, e.details);
+	    }
+	  }
+
+	  selectRoute(msg) {
+	    switch (msg.service.type) {
+	      //couple of special types
+	      case CONST.MSG_TYPE.RESPONSE:
+	        this.routeResponse(msg);
+	        break;
+
+	      case CONST.MSG_TYPE.EVENT:
+	        this.routeEvent(msg);
+	        break;
+	      //all other
+
+	      default:
+	        this.routeCommon(msg);
+	    }
+	  }
+
+	  routeResponse(msg) {
+	    let request = this.fullfillRequest(msg.service.id);
+
+	    if (request !== null) {
+	      request.cb(msg);
+	    }
+	  }
+
+	  routeEvent(msg) {
+	    this.router.route(msg.service, msg.payload, this.connection.getSocket()).catch(e => {
+	      this.logError(e);
+	    });
+	  }
+
+	  routeCommon(msg) {
+	    this.router.route(msg.service, msg.payload, this.connection.getSocket()).then(responseData => {
+	      this.respond(responseData, {
+	        id: msg.service.id,
+	        type: CONST.MSG_TYPE.RESPONSE,
+	        name: msg.service.name
+	      });
+	    }).catch(e => {
+	      this.logError(e);
+	      this.respond({}, {
+	        id: msg.service.id,
+	        type: CONST.MSG_TYPE.RESPONSE,
+	        name: msg.service.name
+	      }, e);
+	    });
+	  }
+
+	  respond(resp, service = {}, error) {
+	    if (resp && typeof resp === 'object' && resp !== null) {
+	      let msg = this.messenger.pack(resp, service, error);
+	      return this.connection.send(msg);
+	    } else {
+	      return true;
+	    }
+	  }
+	  /**
+	  *  Отправка данных определенного типа и названия
+	  *  @param {string}  type  тип данных
+	  *  @param {string}  name  название
+	  *  @param {object}  payload  данные
+	  *  @returns  {Promise}
 	  */
 
 
 	  send(type, name, payload) {
 	    if (type === CONST.MSG_TYPE.REQUEST) {
-	      return this.sendRequest(name, payload);
+	      return this.request(name, payload);
 	    } else {
-	      return this.sendMessage(type, name, payload);
+	      return this.message(type, name, payload);
 	    }
 	  }
 
-	  sendMessage(type, name, payload) {
+	  message(type, name, payload) {
 	    if (payload !== 'pong' && payload !== 'ping') {
 	      this.logMsg('outgoing message', type, name);
 	    }
@@ -8186,11 +8464,11 @@ var notWSClient = (function () {
 	      timeOffset: this.timeOffset,
 	      name
 	    });
-	    return this.sendMsg(message).catch(this.logError.bind(this));
+	    return this.connection.send(message).catch(this.logError.bind(this));
 	  } //Отправка запроса на сервер.
 
 
-	  sendRequest(name, payload) {
+	  request(name, payload) {
 	    this.logMsg('outgoing request', name);
 	    return new Promise((res, rej) => {
 	      try {
@@ -8203,12 +8481,72 @@ var notWSClient = (function () {
 
 	        this.addRequest(this.messenger.getServiceData(req).id, res); //Отправка запроса на сервер.
 
-	        this.ws.send(JSON.stringify(req));
+	        this.connection.send(req);
 	      } catch (e) {
 	        this.logError(e);
 	        rej(e);
 	      }
 	    });
+	  }
+
+	  isSecure() {
+	    return this.connection.isSecure();
+	  }
+
+	  isConnected() {
+	    return this.connection.isConnected();
+	  }
+
+	  isDead() {
+	    return this.connection.isDead();
+	  }
+
+	  isAutoReconnect() {
+	    return this.connection.isAutoReconnect();
+	  }
+	  /**
+	  * Server time
+	  */
+
+
+	  requestServerTime() {
+	    if (this.connection.isConnected()) {
+	      let req = {
+	        cmd: 'getTime',
+	        data: {}
+	      };
+	      const sendTime = Date.now();
+	      this.request(req, (err, result) => {
+	        if (err) {
+	          this.logError(err);
+	        } else {
+	          const receiveTime = Date.now();
+	          const correction = Math.round((receiveTime - sendTime) / 2);
+	          const serverTime = parseInt(result, 10);
+	          const correctedTime = serverTime + correction;
+	          const offset = correctedTime - receiveTime;
+	          this.timeOffset = offset;
+	        }
+	      });
+	    }
+	  }
+
+	  set timeOffset(val) {
+	    this._timeOffset = val;
+	  }
+
+	  get timeOffset() {
+	    return this._timeOffset;
+	  }
+
+	  getTimeOnAuthorized() {
+	    if (this.getTimeOffsetInt) {
+	      clearInterval(this.getTimeOffsetInt);
+	      this.getTimeOffsetInt = null;
+	    }
+
+	    this.requestServerTime();
+	    this.getTimeOffsetInt = setInterval(this.requestServerTime.bind(this), TIME_OFFSET_REQUEST_INTERVAL);
 	  } //набор методов для работы с запросами и выявления безответных
 	  //Запуск таймера проверки запросов.
 
@@ -8245,7 +8583,7 @@ var notWSClient = (function () {
 
 	    this.requests.splice(reqIndex, 1); //Выполнение callback'а запроса.
 
-	    if (LOG.isFunc(request.cb)) {
+	    if (Func.isFunc(request.cb)) {
 	      return request;
 	    } else {
 	      return null;
@@ -8286,7 +8624,7 @@ var notWSClient = (function () {
 
 	      let request = this.requests[reqIndex];
 
-	      if (LOG.isFunc(request.cb)) {
+	      if (Func.isFunc(request.cb)) {
 	        request.cb(CONST.ERR_MSG.REQUEST_TIMEOUT);
 	      } else {
 	        this.logMsg(`timeout check:Не задан callback для запроса с id: ${reqId}`);

@@ -4,7 +4,7 @@ const EventEmitter = require('events');
 const jwt         = require('jsonwebtoken');
 
 const CONST = require('./const.js');
-const LOG = require('./log.js');
+const Func = require('./func.js');
 const notWSRouter = require('./router.js');
 
 const notWSServerClient = require('./server.client.js');
@@ -16,13 +16,15 @@ const DEFAULT_OPTIONS = {
   routes:{
     test: {
       sayHello(){
-        LOG.logMsg('Say hello for test route!');
+        // eslint-disable-next-line no-console
+        console.log('Say hello for test route!');
         return Promise.resolve(true);
       }
     },
     request:{
       auth(){
-        LOG.logMsg('request.auth');
+        // eslint-disable-next-line no-console
+        console.log('request.auth');
       }
     }
   },
@@ -40,11 +42,11 @@ class notWSServer extends EventEmitter{
   constructor(options = {}){
     super();
     let logger = options.logger;
-    this.options     = Object.assign({}, DEFAULT_OPTIONS, options);
+    this.options = Object.assign({}, DEFAULT_OPTIONS, options);
 
-    this.logMsg = logger?logger.log:LOG.genLogMsg(this.options.name?this.options.name:CONST.DEFAULT_SERVER_NAME);
-		this.logDebug = logger?logger.debug:LOG.genLogDebug(this.options.name?this.options.name:CONST.DEFAULT_SERVER_NAME);
-		this.logError = logger?logger.error:LOG.genLogError(this.options.name?this.options.name:CONST.DEFAULT_SERVER_NAME);
+    this.logMsg = logger?logger.log:()=>{};
+		this.logDebug = logger?logger.debug:()=>{};
+		this.logError = logger?logger.error:()=>{};
 
     this.wsServer   = null;
     this.isClosing   = false;
@@ -155,12 +157,12 @@ class notWSServer extends EventEmitter{
     });
     this.emit('connection', wsConn, req);
     if(this.options.ping){
-      wsConn.on('pong', CONST.heartbeat);
+      wsConn.on('pong', Func.heartbeat);
     }
     wsConn.once('errored', this.terminateAndRemoveWSClient.bind(this));
     if(Object.prototype.hasOwnProperty.call(this.options,'events') &&
       Object.prototype.hasOwnProperty.call(this.options.events,'onmessage' &&
-      LOG.isFunc(this.options.events.onmessage)
+      Func.isFunc(this.options.events.onmessage)
       )){
         wsConn.on('message', this.options.events.onmessage);
     }
@@ -171,7 +173,7 @@ class notWSServer extends EventEmitter{
   }
 
   getMessengerForClient(conn, req){
-    if(LOG.isFunc(this.options.getMessenger)){
+    if(Func.isFunc(this.options.getMessenger)){
       return this.options.getMessenger(conn, req);
     }else{
       return new notWSMessage();
@@ -179,7 +181,7 @@ class notWSServer extends EventEmitter{
   }
 
   getRouterForClient(conn, req){
-    if(LOG.isFunc(this.options.getRouter)){
+    if(Func.isFunc(this.options.getRouter)){
       return this.options.getRouter(conn, req);
     }else{
       return this.clientRouter;
@@ -220,7 +222,7 @@ class notWSServer extends EventEmitter{
     if (wsc){
       if(Object.prototype.hasOwnProperty.call(this.options,'events') &&
         Object.prototype.hasOwnProperty.call(this.options.events,'onmessage' &&
-        LOG.isFunc(this.options.events.onmessage)
+        Func.isFunc(this.options.events.onmessage)
         )){
           wsc.removeListener('message', this.options.events.onmessage);
       }
@@ -309,7 +311,7 @@ class notWSServer extends EventEmitter{
   * @returns {Array}
   */
   getClients(filter){
-    if(LOG.isFunc(filter)){
+    if(Func.isFunc(filter)){
       return this.wsClients.filter(filter);
     }else{
       return this.wsClients;
@@ -322,7 +324,7 @@ class notWSServer extends EventEmitter{
   * @returns {notWSServerClient}
   */
   getClient({test, _id}){
-    if(!LOG.isFunc(test) && _id){
+    if(!Func.isFunc(test) && _id){
       test = (client)=>{
         if(client.identity){
           if(client.identity && client.identity._id){
