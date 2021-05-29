@@ -399,7 +399,6 @@ describe('notWSConnection', () => {
           ip: '127.0.0.1',
           secure: true
         });
-        client.state = CONST.STATE.AUTHORIZED;
         expect(client.isConnected()).to.be.true;
         done();
       } catch (e) {
@@ -414,10 +413,9 @@ describe('notWSConnection', () => {
         sock.readyState = 1;
         client = new notWSConnection({
           ws: sock,
-          state: 'offline',
+          secure: true,
           ip: '127.0.0.1'
         });
-        client.state = CONST.STATE.AUTHORIZED;
         expect(client.isConnected()).to.be.true;
         done();
       } catch (e) {
@@ -582,7 +580,8 @@ describe('notWSConnection', () => {
         sock.readyState = 1;
         client = new notWSConnection({
           ws: sock,
-          ip: '127.0.0.1'
+          ip: '127.0.0.1',
+          secure: false
         });
         client.on('authorized', () => done());
         expect(client.state).to.be.equal(CONST.STATE.CONNECTED);
@@ -600,7 +599,8 @@ describe('notWSConnection', () => {
         sock.readyState = 1;
         client = new notWSConnection({
           ws: sock,
-          ip: '127.0.0.1'
+          ip: '127.0.0.1',
+          secure: false
         });
         client.disconnect = () => {
           done();
@@ -621,7 +621,8 @@ describe('notWSConnection', () => {
         sock.readyState = 1;
         client = new notWSConnection({
           ws: sock,
-          ip: '127.0.0.1'
+          ip: '127.0.0.1',
+          secure: false
         });
         client.disconnect = () => {
           done();
@@ -640,7 +641,8 @@ describe('notWSConnection', () => {
         sock.readyState = 1;
         client = new notWSConnection({
           ws: sock,
-          ip: '127.0.0.1'
+          ip: '127.0.0.1',
+          secure: false
         });
         client.reconnect = () => {
           done();
@@ -688,7 +690,6 @@ describe('notWSConnection', () => {
           ws: sock,
           ip: '127.0.0.1'
         });
-        client.state = CONST.STATE.AUTHORIZED;
         clearInterval(client.getTimeOffsetInt);
         expect(client.state).to.be.equal(CONST.STATE.AUTHORIZED);
         client.state = CONST.STATE.CONNECTED;
@@ -707,7 +708,6 @@ describe('notWSConnection', () => {
           ws: sock,
           ip: '127.0.0.1'
         });
-        client.state = CONST.STATE.AUTHORIZED;
         clearInterval(client.getTimeOffsetInt);
         expect(client.state).to.be.equal(CONST.STATE.AUTHORIZED);
         client.disconnect = () => {
@@ -727,12 +727,11 @@ describe('notWSConnection', () => {
         sock.readyState = 1;
         client = new notWSConnection({
           ws: sock,
-          ip: '127.0.0.1'
+          ip: '127.0.0.1',
         });
         client.disconnect = () => {
           done();
         }
-        client.state = CONST.STATE.AUTHORIZED;
         clearInterval(client.getTimeOffsetInt);
         expect(client.state).to.be.equal(CONST.STATE.AUTHORIZED);
         client.state = CONST.STATE.ERRORED;
@@ -749,13 +748,13 @@ describe('notWSConnection', () => {
         sock.readyState = 1;
         client = new notWSConnection({
           ws: sock,
-          ip: '127.0.0.1'
+          ip: '127.0.0.1',
         });
         client.reconnect = function() {
           done();
         }
         client.requestServerTime = () => {};
-        client.state = CONST.STATE.AUTHORIZED;
+
         clearInterval(client.getTimeOffsetInt);
         expect(client.state).to.be.equal(CONST.STATE.AUTHORIZED);
         client.state = CONST.STATE.NOT_CONNECTED;

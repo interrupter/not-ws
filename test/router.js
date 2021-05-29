@@ -238,7 +238,7 @@ describe('notWSRouter', () => {
       router = new notWSRouter({routes});
       router.setRoutesForType('test', {me(){}});
       expect(router.routes).to.have.property('test');
-      expect(router.routes.test).to.have.keys(['me']);
+      expect(router.routes.test).to.have.keys(['me', 'sayHello']);
   });
 
   it('setRoutesForType: good type - exists, good routes', () => {
@@ -253,7 +253,7 @@ describe('notWSRouter', () => {
       router = new notWSRouter({routes});
       router.setRoutesForType('test', {me(){}});
       expect(router.routes).to.have.property('test');
-      expect(router.routes.test).to.have.keys(['me', 'man']);
+      expect(router.routes.test).to.have.keys(['me', 'man', 'sayHello']);
   });
 
 
@@ -307,10 +307,10 @@ describe('notWSRouter', () => {
         }
       },
       router = new notWSRouter({routes});
-      router.unsetRoutesForType('test', ['man']);
-      expect(Object.keys(router.routes).length).to.be.equal(1);
+      router.unsetRoutesForType('test', ['man', 'sayHello']);
+      expect(Object.keys(router.routes).length).to.be.equal(2);
       router.unsetRoutesForType('__service', ['updateToken']);
-      expect(Object.keys(router.routes).length).to.be.equal(0);
+      expect(Object.keys(router.routes).length).to.be.equal(1);
   });
 
   it('unsetRoutesForType: good type - exists, good list of routes', () => {
@@ -330,8 +330,8 @@ describe('notWSRouter', () => {
       },
       router = new notWSRouter({routes});
       router.unsetRoutesForType('test', ['man', 'woman']);
-      expect(Object.keys(router.routes).length).to.be.equal(2);
-      expect(router.routes.test).to.have.keys(['kid']);
+      expect(Object.keys(router.routes).length).to.be.equal(3);
+      expect(router.routes.test).to.have.keys(['kid', 'sayHello']);
   });
 
   it('unsetRoutesForType: good type - exists, good list of routes, but some does not exist', () => {
@@ -351,8 +351,8 @@ describe('notWSRouter', () => {
       },
       router = new notWSRouter({routes});
       router.unsetRoutesForType('test', ['man', 'woman', 'oldman']);
-      expect(Object.keys(router.routes).length).to.be.equal(2);
-      expect(router.routes.test).to.have.keys(['kid']);
+      expect(Object.keys(router.routes).length).to.be.equal(3);
+      expect(router.routes.test).to.have.keys(['kid', 'sayHello']);
   });
 
   it('unsetRoutesForType: good type - exists, list is not specified', () => {
@@ -372,8 +372,8 @@ describe('notWSRouter', () => {
       },
       router = new notWSRouter({routes});
       router.unsetRoutesForType('test');
-      expect(Object.keys(router.routes).length).to.be.equal(2);
-      expect(router.routes.test).to.have.keys(['kid', 'woman', 'man']);
+      expect(Object.keys(router.routes).length).to.be.equal(3);
+      expect(router.routes.test).to.have.keys(['kid', 'sayHello', 'woman', 'man']);
   });
 
   it('unsetRoutesForType: bad type - not exists, good list of routes', () => {
@@ -393,8 +393,8 @@ describe('notWSRouter', () => {
       },
       router = new notWSRouter({routes});
       router.unsetRoutesForType('tst', ['man', 'woman']);
-      expect(Object.keys(router.routes).length).to.be.equal(2);
-      expect(router.routes.test).to.have.keys(['kid', 'man', 'woman']);
+      expect(Object.keys(router.routes).length).to.be.equal(3);
+      expect(router.routes.test).to.have.keys(['kid', 'sayHello', 'man', 'woman']);
   });
 
 });
