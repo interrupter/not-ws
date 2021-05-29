@@ -1,15 +1,17 @@
-//imports
 
 const EventEmitter = require('events');
+
+const JWT = require('jsonwebtoken');
+
 const CONST = require('./const.js');
 const Func = require('./func.js');
+
 const notWSRouter = require('./router.js');
 const notWSMessenger = require('./messenger.js');
 const notWSConnection = require('./connection.js');
 
 
 
-//class definition with minor env dependence
 /**
 *
 * Client - main function is to connect and handle requests from/to server.
@@ -29,10 +31,9 @@ const notWSConnection = require('./connection.js');
 * @params {notWSMessenger}  messenger         - message handler
 * @params {notWSRouter}     router            - request handler
 * @params {object}          logger            - log interface {function:log, function:debug, function:error}
+* @params {boolean}         slave             - true - this is server child connection for remote client, false - it is connection to another server
 *
 **/
-
-const TIME_OFFSET_REQUEST_INTERVAL = 5 * 60 * 1000;
 
 class notWSClient extends EventEmitter{
 	constructor({
@@ -41,7 +42,10 @@ class notWSClient extends EventEmitter{
 		getToken,
 		messenger,
 		router,
-		logger
+		logger,
+		identity,          //user information
+		credentials,        //client creds for access
+		slave = false
 	}){
 		if(!router || !(router instanceof notWSRouter)){
 			throw new Error('Router is not set or is not instance of notWSRouter');
@@ -51,17 +55,24 @@ class notWSClient extends EventEmitter{
 		}
 		super();
 		//Основные параметры
-		this.__name = name || 'WSClient';
+		this.__name = name ? name : CONST.DEFAULT_CLIENT_NAME;
 		//jwt
 		this.jwtToken = null; //Токен авторизации.
 		this.jwtExpire = null; //Время до истечения токена.
 		this.jwtDate = null; //Дата создания токена.
-		//Подключение к WS
-		this.initConnection(connection);
+		//setting envs
 		this.tokenGetter = getToken;
+		this.identity = identity;
+		this.credentials = credentials;
 		this.messenger = messenger;
 		this.router =   router;
-		this.router.on('updateToken', this.renewToken.bind(this));
+		this.slave = slave;
+		//Подключение к WS
+		this.initConnection(connection, this.slave);
+		if(!this.slave){
+			this.router.on('updateToken', this.renewToken.bind(this));
+		}
+		//common constructor part for client browser client, node client, node server client
 		//logging
 		this.logMsg = logger?logger.log:()=>{};
 		this.logDebug = logger?logger.debug:()=>{};
@@ -74,16 +85,17 @@ class notWSClient extends EventEmitter{
 		//time off set from server time
 		this._timeOffset = 0;
 		this.getTimeOffsetInt = null;
-		//message history if in online
-		this.history = [];
-
-		this.connect();
+		if(!this.slave){
+			this.connect();
+		}
+		return this;
 	}
+
 
 	initConnection(connection){
 		this.connection = new notWSConnection(connection);
 		this.connection.on('disconnected', ()=>{
-			this.logMsg('dicconnected');
+			this.logMsg('disconnected');
 			this.stopReqChckTimer();
 			this.emit('close', this);
 		});
@@ -99,229 +111,75 @@ class notWSClient extends EventEmitter{
 			this.logError(e);
 		});
 		this.connection.on('message', this.processMessage.bind(this));
+
+		this.connection.on('ready', ()=>{
+			this.logMsg('ready');
+			this.emit('ready', this);
+		});
+
+		this.connection.on('ping', ()=>{
+			this.logMsg('ping');
+		});
+		this.connection.on('pong', ()=>{
+			this.logMsg('pong');
+		});
 	}
 
 	async connect(){
-		try{
-			//если нужна аутентификация
-			if(this.connection.isSecure()){
-				//получаем и сохраняем токен токен
-				this.saveToken(await this.getToken());
-			}
-			//подключаемся
-			this.connection.connect();
-		}catch(e){
-			this.logError(e);
-		}
-	}
-
-	//Получение токена.
-	//Возможно реализовать разными способами, поэтому выделено в отдельный метод.
-	getToken(){
-    
-		if(Func.isFunc(this.tokenGetter)){
-			return this.tokenGetter();
-		}else{
-			return Promise.reject();
-		}
-    
-	}
-
-	async renewToken(){
-		try{
-			let token = await this.getToken(true);
-			if(token){
-				this.saveToken(token);
-			}else{
-				throw new Error('Token isn\'t renewed');
-			}
-		}catch(e){
-			this.logError(e);
-		}
-	}
-
-	saveToken(token){
-    
-		this.jwtToken = token;
-		this.messenger.setCredentials(token);
-		this.connection.setToken(token);
-		this.emit('tokenUpdated', token);
-	}
-
-	//Обработчик сообщений пришедших от сервера.
-	//data - JSON
-	processMessage(data){
-		try{
-			this.messenger.validate(data);
-			let msg = this.messenger.unpack(data);
-			//general event
-			this.emit('message', msg, this);
-			//specific event
-			this.emit(msg.service.type + ':' + msg.service.name, msg.service, msg.payload, this.connection.getSocket());
-			//routing
-			this.selectRoute(msg);
-		}catch(e){
-			this.logError(e, e.details);
-      
-			if(e.message === CONST.ERR_MSG.MSG_CREDENTIALS_IS_NOT_VALID){
-				this.informClientAboutExperiedToken();
-			}
-      
-		}
-	}
-
-	selectRoute(msg){
-		switch(msg.service.type){
-		//couple of special types
-		case CONST.MSG_TYPE.RESPONSE: this.routeResponse(msg);  break;
-		case CONST.MSG_TYPE.EVENT:    this.routeEvent(msg);     break;
-			//all other
-		default:                      this.routeCommon(msg);
-		}
-	}
-
-	routeResponse(msg){
-		let request = this.fullfillRequest(msg.service.id);
-		if(request !== null){
-			request.cb(msg);
-		}
-	}
-
-	routeEvent(msg){
-		this.router.route(msg.service, msg.payload, this.connection.getSocket())
-			.catch((e)=>{
-				this.logError(e);
-			});
-	}
-
-	routeCommon(msg){
-		this.router.route(msg.service, msg.payload, this.connection.getSocket())
-			.then((responseData)=>{
-				this.respond(responseData, {id: msg.service.id, type: CONST.MSG_TYPE.RESPONSE, name: msg.service.name});
-			})
-			.catch((e)=>{
-				this.logError(e);
-				this.respond({}, {id: msg.service.id, type: CONST.MSG_TYPE.RESPONSE, name: msg.service.name}, e);
-			});
-	}
-
-	respond(resp, service = {}, error){
-		if(resp && typeof resp === 'object' && resp !== null){
-			let msg = this.messenger.pack(resp, service, error);
-			return this.connection.send(msg);
-		}else{
-			return true;
-		}
-	}
-
-	/**
-  *  Отправка данных определенного типа и названия
-  *  @param {string}  type  тип данных
-  *  @param {string}  name  название
-  *  @param {object}  payload  данные
-  *  @returns  {Promise}
-  */
-	send(type, name, payload){
-		if(type === CONST.MSG_TYPE.REQUEST){
-			return this.request(name, payload);
-		}else{
-			return this.message(type, name, payload);
-		}
-	}
-
-	message(type, name, payload){
-		if((payload!== 'pong') && ( payload!== 'ping')){
-			this.logMsg('outgoing message', type, name);
-		}
-		let message = this.messenger.pack(payload, {
-			type,
-			timeOffset: this.timeOffset,
-			name,
-		});
-		return this.connection.send(message).catch(this.logError.bind(this));
-	}
-
-	//Отправка запроса на сервер.
-	request(name, payload){
-		this.logMsg('outgoing request', name);
-		return new Promise((res, rej)=>{
+		if(!this.slave){
 			try{
-				//Формирование данных запроса.
-				let req = this.messenger.pack(payload, {
-					type:       'request',
-					timeOffset: this.timeOffset,
-					name,
-				});
-				//Добавление запроса в список отправленных запросов.
-				this.addRequest(this.messenger.getServiceData(req).id, res);
-				//Отправка запроса на сервер.
-				this.connection.send(req);
+				if(!this.isConnected()){
+					//если нужна аутентификация
+					if(this.connection.isSecure()){
+						//получаем и сохраняем токен токен
+						this.saveToken(await this.getToken());
+					}
+					//подключаемся
+					this.connection.connect();
+				}
 			}catch(e){
 				this.logError(e);
-				rej(e);
 			}
-		});
+		}
+	}
+
+	suicide() {
+		this.emit('errored', this);
+	}
+
+	disconnect(){
+		this.connection.disconnect();
+	}
+
+	terminate(){
+		this.connection.terminate();
+		this.connection.destroy();
+	}
+
+	isDead() {
+		return !this.connection.isAlive();
+	}
+
+	isAlive() {
+		return this.connection.isAlive();
+	}
+
+	reconnect() {
+		this.connection.reconnect();
+	}
+
+	isConnected(secure = true) {
+		return this.connection.isConnected(secure);
 	}
 
 	isSecure() {
 		return this.connection.isSecure();
 	}
 
-	isConnected(){
-		return this.connection.isConnected();
-	}
-
-	isDead() {
-		return this.connection.isDead();
-	}
-
 	isAutoReconnect(){
 		return this.connection.isAutoReconnect();
 	}
 
-	/**
-  * Server time
-  */
-	requestServerTime() {
-		if (this.connection.isConnected()) {
-			let req = {
-				cmd: 'getTime',
-				data: {}
-			};
-			const sendTime = Date.now();
-			this.request(req, (err, result) => {
-				if (err) {
-					this.logError(err);
-				} else {
-					const receiveTime = Date.now();
-					const correction = Math.round((receiveTime - sendTime) / 2);
-					const serverTime = parseInt(result, 10);
-					const correctedTime = serverTime + correction;
-					const offset = correctedTime - receiveTime;
-					this.timeOffset = offset;
-				}
-			});
-		}
-	}
-
-	set timeOffset(val) {
-		this._timeOffset = val;
-	}
-
-	get timeOffset() {
-		return this._timeOffset;
-	}
-
-	getTimeOnAuthorized(){
-		if (this.getTimeOffsetInt) {
-			clearInterval(this.getTimeOffsetInt);
-			this.getTimeOffsetInt = null;
-		}
-		this.requestServerTime();
-		this.getTimeOffsetInt = setInterval(this.requestServerTime.bind(this), TIME_OFFSET_REQUEST_INTERVAL);
-	}
-
-	//набор методов для работы с запросами и выявления безответных
   
 	//Запуск таймера проверки запросов.
 	startReqChckTimer() {
@@ -396,7 +254,267 @@ class notWSClient extends EventEmitter{
 		});
 	}
 
+
+  
+	getCredentials() {
+		return this.options.credentials;
+	}
+
+	setCredentials(val = null) {
+		this.options.credentials = val;
+		this.emit('credentialsUpdate', val);
+		return this;
+	}
+
+	credentialsIsValid(){
+		if (JWT){
+			return new Promise((resolve, reject)=>{
+				let cred = this.getCredentials();
+				JWT.verify(cred, this.options.credentials.key, (err, decoded)=>{
+					if(err){
+						reject(err);
+					}else{
+						if(typeof decoded !== 'undefined'){
+							resolve(true);
+						}else{
+							reject(new Error('Decoded token is undefined'));
+						}
+					}
+				});
+			});
+		}else{
+			return Promise.reject(new Error('JWT not defined'));
+		}
+	}
+
+	onAfterValidation(err, decoded){
+		if(err){
+			return false;
+		}else if(typeof decoded !== 'undefined' && decoded !== null){
+			return true;
+		}else{
+			return false;
+		}
+	}
+
+  
+
+	//Получение токена.
+	//Возможно реализовать разными способами, поэтому выделено в отдельный метод.
+	getToken(){
+    
+		if(Func.isFunc(this.tokenGetter)){
+			return this.tokenGetter();
+		}else{
+			return Promise.reject();
+		}
+    
+	}
+
+	async renewToken(){
+		if (!this.slave){
+			try{
+				let token = await this.getToken(true);
+				if(token){
+					this.saveToken(token);
+				}else{
+					throw new Error('Token isn\'t renewed');
+				}
+			}catch(e){
+				this.logError(e);
+			}
+		}
+	}
+
+	saveToken(token){
+		if (!this.slave){
+      
+			this.jwtToken = token;
+			this.messenger.setCredentials(token);
+			this.connection.setToken(token);
+			this.emit('tokenUpdated', token);
+		}
+	}
+
+	ping(){
+		this.connection.sendPing();
+	}
+
+	processMessage(data) {
+		try{
+			this.messenger.validate(data);
+			let msg = this.messenger.unpack(data);
+			this.emit('message', msg, this);
+			this.emit(msg.service.type + ':' + msg.service.name, msg.service, msg.payload, this.connection.getSocket());
+			//routing
+			this.selectRoute(msg);
+		}catch(e){
+			this.logError(e, e.details);
+      
+			if(e.message === CONST.ERR_MSG.MSG_CREDENTIALS_IS_NOT_VALID){
+				this.informClientAboutExperiedToken();
+			}
+      
+		}
+	}
+
+	selectRoute(msg){
+		switch(msg.service.type){
+		//couple of special types
+		case CONST.MSG_TYPE.RESPONSE: this.routeResponse(msg);  break;
+		case CONST.MSG_TYPE.REQUEST:   this.routeRequest(msg);  break;
+		case CONST.MSG_TYPE.EVENT:    this.routeEvent(msg);     break;
+			//all other
+		default:                      this.routeCommon(msg);
+		}
+	}
+
+	routeResponse(msg){
+		let request = this.fullfillRequest(msg.service.id);
+		if(request !== null){
+			request.cb(msg);
+		}
+	}
+
+	routeEvent(msg){
+		this.router.route(msg.service, msg.payload, this.connection.getSocket())
+			.catch((e)=>{
+				this.logError(e);
+			});
+	}
+
+	routeCommon(msg){
+		this.router.route(msg.service, msg.payload, this.connection.getSocket())
+			.catch((e)=>{
+				this.logError(e);
+				this.respond({}, {id: msg.service.id, type: CONST.MSG_TYPE.RESPONSE, name: msg.service.name}, e);
+			});
+	}
+
+	routeRequest(msg){
+		this.router.route(msg.service, msg.payload, this.connection.getSocket())
+			.then((responseData)=>{
+				this.respond(responseData, {id: msg.service.id, type: CONST.MSG_TYPE.RESPONSE, name: msg.service.name});
+			})
+			.catch((e)=>{
+				this.logError(e);
+				this.respond({}, {id: msg.service.id, type: CONST.MSG_TYPE.RESPONSE, name: msg.service.name}, e);
+			});
+	}
+
+	/**
+  *  Отправка данных определенного типа и названия
+  *  @param {string}  type  тип данных
+  *  @param {string}  name  название
+  *  @param {object}  payload  данные
+  *  @returns  {Promise}
+  */
+	send(type, name, payload){
+		if(type === CONST.MSG_TYPE.REQUEST){
+			return this.request(name, payload);
+		}else{
+			return this.message(type, name, payload);
+		}
+	}
+
+	respond(resp, service = {}, error){
+		if(typeof resp === 'object' && resp !== null){
+			let msg = this.messenger.pack(resp, service, error);
+			return this.connection.send(msg);
+		}else{
+			return true;
+		}
+	}
+
+	__request(name, payload, cb, secure = true) {
+		let message = this.messenger.pack(payload, {
+			type: CONST.MSG_TYPE.REQUEST,
+			timeOffset: this.timeOffset,
+			name,
+		});
+		this.addRequest(this.messenger.getServiceData(message).id, cb);
+		this.connection.send(message, secure).catch(this.logError.bind(this));
+	}
+
+	request(name, payload, secure = true) {
+		return new Promise((resolve, reject) => {
+			try {
+				this.__request(name, payload, (response) => {
+					if (response === CONST.ERR_MSG.REQUEST_TIMEOUT_MESSAGE) {
+						return reject(response);
+					}
+					if (this.messenger.validate(response)) {
+						if (this.messenger.isErrored(response)) {
+							return reject(response);
+						}
+					}
+					resolve(response);
+				}, secure);
+			} catch (e) {
+				reject(e);
+			}
+		});
+	}
+
+	message(type, name, payload){
+		if((payload!== 'pong') && ( payload!== 'ping')){
+			this.logMsg('outgoing message', type, name);
+		}
+		let message = this.messenger.pack(payload, {
+			type,
+			timeOffset: this.timeOffset,
+			name,
+		});
+		return this.connection.send(message).catch(this.logError.bind(this));
+	}
+
+
+	informClientAboutExperiedToken(){
+		this.logMsg('force to update token');
+		this.send('__service', 'updateToken', {}, false).catch(this.logError.bind(this));
+	}
+
+
+	/**
+  * Server time
+  */
+	requestServerTime() {
+		if (this.connection.isConnected()) {
+			const sendTime = Date.now();
+			this.request('getTime', {}, )
+				.then((result)=>{
+					const receiveTime = Date.now();
+					const correction = Math.round((receiveTime - sendTime) / 2);
+					const serverTime = parseInt(result, 10);
+					const correctedTime = serverTime + correction;
+					const offset = correctedTime - receiveTime;
+					this.timeOffset = offset;
+				})
+				.catch((err)=>{
+					this.logError(err);
+				});
+		}
+	}
+
+	set timeOffset(val) {
+		this._timeOffset = val;
+	}
+
+	get timeOffset() {
+		return this._timeOffset;
+	}
+
+	getTimeOnAuthorized(){
+		if (this.getTimeOffsetInt) {
+			clearInterval(this.getTimeOffsetInt);
+			this.getTimeOffsetInt = null;
+		}
+		this.requestServerTime();
+		this.getTimeOffsetInt = setInterval(this.requestServerTime.bind(this), CONST.TIME_OFFSET_REQUEST_INTERVAL);
+	}
+
 }
+
 
 
 //env dep export

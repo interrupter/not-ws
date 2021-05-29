@@ -18,17 +18,18 @@ function getFakeMessenger(options) {
   return res;
 }
 
-
+let sock, client;
 
 describe('notWSConnection', () => {
   it('creating default', (done) => {
     try {
-      let sock = new EventEmitter();
+      sock = new EventEmitter();
       sock.terminate = () => {};
-      new notWSConnection({
+      sock.readyState = 0;
+      client = new notWSConnection({
         ws: sock,
-        state: 'offline',
       });
+      client.destroy();
       done();
     } catch (e) {
       done(e);
@@ -38,26 +39,26 @@ describe('notWSConnection', () => {
 
   describe('Socket events', () => {
     after(function () {
-    //  global.asyncDump();
+      global.asyncDump();
+    });
+
+    afterEach(()=>{
+      client.destroy();
     });
 
     it('reaction on open event', (done) => {
       try {
-        let sock = new EventEmitter();
+        sock = new EventEmitter();
         sock.terminate = () => {};
-        let client = new notWSConnection({
+        sock.readyState = 0;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1',
         });
         client.on('connected', () => {
           client.terminate();
           done();
         });
-        setTimeout(()=>{
-          clearInterval(client.connectInterval);
-          clearTimeout(client.disconnectTimeout);
-        },1000);
         sock.emit('open', 'Hello, socket!');
       } catch (e) {
         expect(e.message).to.be.equal('Message is not JSON!');
@@ -68,11 +69,11 @@ describe('notWSConnection', () => {
 
     it('reaction on message event, valid JSON input', (done) => {
       try {
-        let sock = new EventEmitter();
+        sock = new EventEmitter();
         sock.terminate = () => {};
-        let client = new notWSConnection({
+        sock.readyState = 0;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         client.diconnect = () => {};
@@ -83,10 +84,6 @@ describe('notWSConnection', () => {
           client.terminate();
           done();
         });
-        setTimeout(()=>{
-          clearInterval(client.connectInterval);
-          clearTimeout(client.disconnectTimeout);
-        },1000);
         sock.emit('message', JSON.stringify({
           name: 'test'
         }));
@@ -97,11 +94,11 @@ describe('notWSConnection', () => {
 
     it('reaction on message event, invalid JSON input', (done) => {
 
-      let sock = new EventEmitter();
+      sock = new EventEmitter();
       sock.terminate = () => {};
-      let client = new notWSConnection({
+      sock.readyState = 0;
+      client = new notWSConnection({
         ws: sock,
-        state: 'offline',
         ip: '127.0.0.1'
       });
       client.diconnect = () => {};
@@ -117,21 +114,17 @@ describe('notWSConnection', () => {
         client.terminate();
         done(new Error('This should throw exception!'));
       });
-      setTimeout(()=>{
-        clearInterval(client.connectInterval);
-        clearTimeout(client.disconnectTimeout);
-      },1000);
       sock.emit('message', 'Hello, socket!');
     });
 
 
     it('reaction on error event, proper Error object (state: NOT_CONNECTED; activity: IDLE)', (done) => {
-        let sock = new EventEmitter();
+        sock = new EventEmitter();
         sock.terminate = () => {};
+        sock.readyState = 0;
         let errorName = 'Message is not JSON!';
-        let client = new notWSConnection({
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         let notChecked =true;
@@ -143,10 +136,6 @@ describe('notWSConnection', () => {
             done();
           }
         });
-        setTimeout(()=>{
-          clearInterval(client.connectInterval);
-          clearTimeout(client.disconnectTimeout);
-        },1000);
         sock.emit('error', new Error(errorName));
         expect(client.state).to.be.equal(CONST.STATE.ERRORED);
         expect(client.activity).to.be.equal(CONST.ACTIVITY.IDLE);
@@ -154,12 +143,12 @@ describe('notWSConnection', () => {
 
    it('reaction on error event, string (state: NOT_CONNECTED; activity: IDLE)', (done) => {
 
-        let sock = new EventEmitter();
+        sock = new EventEmitter();
         sock.terminate = () => {};
+        sock.readyState = 0;
         let errorName = 'Message is not JSON!';
-        let client = new notWSConnection({
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         let checked = false;
@@ -174,10 +163,6 @@ describe('notWSConnection', () => {
             done(new Error('double error call'));
           }
         });
-        setTimeout(()=>{
-          clearInterval(client.connectInterval);
-          clearTimeout(client.disconnectTimeout);
-        },1000);
         client.diconnect = () => {};
         client.reconnect = () => {};
         sock.emit('error', errorName);
@@ -187,12 +172,12 @@ describe('notWSConnection', () => {
     });
 
     it('reaction on error event, string (state: CONNECTED; activity: TERMINATING)', (done) => {
-        let sock = new EventEmitter();
+        sock = new EventEmitter();
         sock.terminate = () => {};
+        sock.readyState = 0;
         let errorName = 'Message is not JSON!';
-        let client = new notWSConnection({
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         client.state = CONST.STATE.CONNECTED;
@@ -202,10 +187,6 @@ describe('notWSConnection', () => {
           client.terminate();
           done();
         } );
-        setTimeout(()=>{
-          clearInterval(client.connectInterval);
-          clearTimeout(client.disconnectTimeout);
-        },1000);
         client.diconnect = () => {};
         client.reconnect = () => {};
         sock.emit('error', errorName);
@@ -215,12 +196,12 @@ describe('notWSConnection', () => {
 
     it('reaction on close event, string (state: CONNECTED; activity: CLOSING)', (done) => {
 
-        let sock = new EventEmitter();
+        sock = new EventEmitter();
         sock.terminate = () => {};
+        sock.readyState = 0;
         let errorName = 'Message is not JSON!';
-        let client = new notWSConnection({
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1',
           credentials: {}
         });
@@ -235,10 +216,6 @@ describe('notWSConnection', () => {
             done();
           }
         });
-        setTimeout(()=>{
-          clearInterval(client.connectInterval);
-          clearTimeout(client.disconnectTimeout);
-        },1000);
         sock.emit('close', errorName);
         expect(client.state).to.be.equal(CONST.STATE.NOT_CONNECTED);
         expect(client.activity).to.be.equal(CONST.ACTIVITY.IDLE);
@@ -247,12 +224,12 @@ describe('notWSConnection', () => {
 
     it('reaction on close event, Error object (state: CONNECTED; activity: IDLE)', (done) => {
 
-        let sock = new EventEmitter();
+        sock = new EventEmitter();
         sock.terminate = () => {};
+        sock.readyState = 0;
         let errorName = 'Message is not JSON!';
-        let client = new notWSConnection({
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         client.diconnect = () => {};
@@ -264,10 +241,6 @@ describe('notWSConnection', () => {
           client.terminate();
           done();
         });
-        setTimeout(()=>{
-          clearInterval(client.connectInterval);
-          clearTimeout(client.disconnectTimeout);
-        },1000);
         let err = new Error(errorName, 1005);
         err.code = 1005;
         sock.emit('close', err);
@@ -277,11 +250,11 @@ describe('notWSConnection', () => {
     });
 
     it('reaction on close event, error code (state: CONNECTED; activity: IDLE)', (done) => {
-        let sock = new EventEmitter();
+        sock = new EventEmitter();
         sock.terminate = () => {};
-        let client = new notWSConnection({
+        sock.readyState = 0;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1',
           credentials: {}
         });
@@ -295,29 +268,28 @@ describe('notWSConnection', () => {
         client.on('terminated', (msg) =>{
           expect(msg).to.be.equal(`No Status Recvd`);
           client.terminate();
+          client.destroy();
           done();
         });
         sock.emit('close', 1005);
         expect(client.state).to.be.equal(CONST.STATE.ERRORED);
         expect(client.activity).to.be.equal(CONST.ACTIVITY.IDLE);
-        setTimeout(()=>{
-          clearInterval(client.connectInterval);
-          clearTimeout(client.disconnectTimeout);
-        },1000);
-
     });
   });
 
 
 
   describe('connection', () => {
+    afterEach(()=>{
+      client.destroy();
+    });
     it('suicide', (done) => {
       try {
-        let sock = new EventEmitter();
+        sock = new EventEmitter();
         sock.terminate = () => {};
-        let client = new notWSConnection({
+        sock.readyState = 0;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         client.on('errored', (t) => {
@@ -333,14 +305,13 @@ describe('notWSConnection', () => {
 
     it('terminate - socket exists; alive; connected', (done) => {
       try {
-        let sock = new EventEmitter();
+        sock = new EventEmitter();
         sock.terminate = () => {};
-        let client = new notWSConnection({
+        sock.readyState = 1;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
-        client.state = CONST.STATE.CONNECTED;
         expect(client.isDead()).to.be.false;
         client.terminate();
         expect(client.isTerminated).to.be.true;
@@ -357,14 +328,13 @@ describe('notWSConnection', () => {
 
     it('terminate - socket is null', (done) => {
       try {
-        let sock = new EventEmitter();
+        sock = new EventEmitter();
         sock.terminate = () => {};
-        let client = new notWSConnection({
+        sock.readyState = 1;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
-        client.state = CONST.STATE.CONNECTED;
         client.ws = null;
         expect(client.isDead()).to.be.false;
         client.terminate();
@@ -380,12 +350,12 @@ describe('notWSConnection', () => {
 
     it('disconnect', (done) => {
       try {
-        let sock = new EventEmitter();
+        sock = new EventEmitter();
         sock.terminate = () => {};
         sock.close = () => {};
-        let client = new notWSConnection({
+        sock.readyState = 0;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1',
           credentials: {}
         });
@@ -403,16 +373,14 @@ describe('notWSConnection', () => {
 
     it('isConnected - insecure', (done) => {
       try {
-        let sock = new EventEmitter();
+        sock = new EventEmitter();
         sock.terminate = () => {};
         sock.readyState = 1;
-        let client = new notWSConnection({
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1',
           secure: false
         });
-        client.state = CONST.STATE.CONNECTED;
         expect(client.isConnected()).to.be.true;
         done();
       } catch (e) {
@@ -423,16 +391,14 @@ describe('notWSConnection', () => {
 
     it('isConnected - secure', (done) => {
       try {
-        let sock = new EventEmitter();
+        sock = new EventEmitter();
         sock.terminate = () => {};
         sock.readyState = 1;
-        let client = new notWSConnection({
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1',
           secure: true
         });
-        client.state = CONST.STATE.CONNECTED;
         client.state = CONST.STATE.AUTHORIZED;
         expect(client.isConnected()).to.be.true;
         done();
@@ -443,15 +409,14 @@ describe('notWSConnection', () => {
 
     it('scheduleConnect - no input timeout', (done) => {
       try {
-        let sock = new EventEmitter();
+        sock = new EventEmitter();
         sock.terminate = () => {};
         sock.readyState = 1;
-        let client = new notWSConnection({
+        client = new notWSConnection({
           ws: sock,
           state: 'offline',
           ip: '127.0.0.1'
         });
-        client.state = CONST.STATE.CONNECTED;
         client.state = CONST.STATE.AUTHORIZED;
         expect(client.isConnected()).to.be.true;
         done();
@@ -462,12 +427,15 @@ describe('notWSConnection', () => {
   });
 
   describe('activity', () => {
+    afterEach(()=>{
+      client.destroy();
+    });
     it('set/get', (done) => {
       try {
-        let sock = new EventEmitter();
-        let client = new notWSConnection({
+        sock = new EventEmitter();
+        sock.readyState = 0;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         //connecting
@@ -511,12 +479,15 @@ describe('notWSConnection', () => {
   });
 
   describe('state', () => {
+    afterEach(()=>{
+      client.destroy();
+    });
     it('set/get - invalid state, should throw error', (done) => {
       try {
-        let sock = new EventEmitter();
-        let client = new notWSConnection({
+        sock = new EventEmitter();
+        sock.readyState = 0;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         let f = () => {
@@ -531,10 +502,10 @@ describe('notWSConnection', () => {
 
     it('set/get - NOT_CONNECTED -> CONNECTED', (done) => {
       try {
-        let sock = new EventEmitter();
-        let client = new notWSConnection({
+        sock = new EventEmitter();
+        sock.readyState = 0;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         expect(client.state).to.be.equal(CONST.STATE.NOT_CONNECTED);
@@ -549,10 +520,10 @@ describe('notWSConnection', () => {
 
     it('set/get - NOT_CONNECTED -> ERRORED, expecting disconnect call', (done) => {
       try {
-        let sock = new EventEmitter();
-        let client = new notWSConnection({
+        sock = new EventEmitter();
+        sock.readyState = 0;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         let checked = false;
@@ -574,10 +545,10 @@ describe('notWSConnection', () => {
 
     it('set/get - NOT_CONNECTED -> [not allowed states: AUTHORIZED, NO_PING, NOT_CONNECTED], throwing Errors', (done) => {
       try {
-        let sock = new EventEmitter();
-        let client = new notWSConnection({
+        sock = new EventEmitter();
+        sock.readyState = 0;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         expect(client.state).to.be.equal(CONST.STATE.NOT_CONNECTED);
@@ -607,13 +578,12 @@ describe('notWSConnection', () => {
 
     it('set/get - CONNECTED -> AUTHORIZED', (done) => {
       try {
-        let sock = new EventEmitter();
-        let client = new notWSConnection({
+        sock = new EventEmitter();
+        sock.readyState = 1;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
-        client.state = CONST.STATE.CONNECTED;
         client.on('authorized', () => done());
         expect(client.state).to.be.equal(CONST.STATE.CONNECTED);
         client.state = CONST.STATE.AUTHORIZED;
@@ -626,16 +596,15 @@ describe('notWSConnection', () => {
 
     it('set/get - CONNECTED -> NO_PING, expecting disconnect call', (done) => {
       try {
-        let sock = new EventEmitter();
-        let client = new notWSConnection({
+        sock = new EventEmitter();
+        sock.readyState = 1;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         client.disconnect = () => {
           done();
         }
-        client.state = CONST.STATE.CONNECTED;
         expect(client.state).to.be.equal(CONST.STATE.CONNECTED);
         client.state = CONST.STATE.NO_PING;
         expect(client.state).to.be.equal(CONST.STATE.NO_PING);
@@ -648,16 +617,15 @@ describe('notWSConnection', () => {
 
     it('set/get - CONNECTED -> ERRORED, expecting disconnect call', (done) => {
       try {
-        let sock = new EventEmitter();
-        let client = new notWSConnection({
+        sock = new EventEmitter();
+        sock.readyState = 1;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         client.disconnect = () => {
           done();
-        }
-        client.state = CONST.STATE.CONNECTED;
+        };
         expect(client.state).to.be.equal(CONST.STATE.CONNECTED);
         client.state = CONST.STATE.ERRORED;
         expect(client.state).to.be.equal(CONST.STATE.ERRORED);
@@ -668,16 +636,15 @@ describe('notWSConnection', () => {
     });
     it('set/get - CONNECTED -> NOT_CONNECTED, expecting reconnect call', (done) => {
       try {
-        let sock = new EventEmitter();
-        let client = new notWSConnection({
+        sock = new EventEmitter();
+        sock.readyState = 1;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         client.reconnect = () => {
           done();
         }
-        client.state = CONST.STATE.CONNECTED;
         expect(client.state).to.be.equal(CONST.STATE.CONNECTED);
         client.state = CONST.STATE.NOT_CONNECTED;
         expect(client.state).to.be.equal(CONST.STATE.NOT_CONNECTED);
@@ -689,10 +656,10 @@ describe('notWSConnection', () => {
 
     it('set/get - CONNECTED -> [not allowed states: NOT_CONNECTED], throwing Errors', (done) => {
       try {
-        let sock = new EventEmitter();
-        let client = new notWSConnection({
+        sock = new EventEmitter();
+        sock.readyState = 0;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         expect(client.state).to.be.equal(CONST.STATE.NOT_CONNECTED);
@@ -715,13 +682,12 @@ describe('notWSConnection', () => {
 
     it('set/get - AUTHORIZED -> CONNECTED', () => {
       try {
-        let sock = new EventEmitter();
-        let client = new notWSConnection({
+        sock = new EventEmitter();
+        sock.readyState = 1;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
-        client.state = CONST.STATE.CONNECTED;
         client.state = CONST.STATE.AUTHORIZED;
         clearInterval(client.getTimeOffsetInt);
         expect(client.state).to.be.equal(CONST.STATE.AUTHORIZED);
@@ -735,13 +701,12 @@ describe('notWSConnection', () => {
 
     it('set/get - AUTHORIZED -> NO_PING, expecting disconnect call', (done) => {
       try {
-        let sock = new EventEmitter();
-        let client = new notWSConnection({
+        sock = new EventEmitter();
+        sock.readyState = 1;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
-        client.state = CONST.STATE.CONNECTED;
         client.state = CONST.STATE.AUTHORIZED;
         clearInterval(client.getTimeOffsetInt);
         expect(client.state).to.be.equal(CONST.STATE.AUTHORIZED);
@@ -758,16 +723,15 @@ describe('notWSConnection', () => {
 
     it('set/get - AUTHORIZED -> ERRORED, expecting disconnect call', (done) => {
       try {
-        let sock = new EventEmitter();
-        let client = new notWSConnection({
+        sock = new EventEmitter();
+        sock.readyState = 1;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         client.disconnect = () => {
           done();
         }
-        client.state = CONST.STATE.CONNECTED;
         client.state = CONST.STATE.AUTHORIZED;
         clearInterval(client.getTimeOffsetInt);
         expect(client.state).to.be.equal(CONST.STATE.AUTHORIZED);
@@ -781,17 +745,16 @@ describe('notWSConnection', () => {
 
     it('set/get - AUTHORIZED -> NOT_CONNECTED, expecting reconnect call', (done) => {
       try {
-        let sock = new EventEmitter();
-        let client = new notWSConnection({
+        sock = new EventEmitter();
+        sock.readyState = 1;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         client.reconnect = function() {
           done();
         }
         client.requestServerTime = () => {};
-        client.state = CONST.STATE.CONNECTED;
         client.state = CONST.STATE.AUTHORIZED;
         clearInterval(client.getTimeOffsetInt);
         expect(client.state).to.be.equal(CONST.STATE.AUTHORIZED);
@@ -805,10 +768,10 @@ describe('notWSConnection', () => {
 
     it('set/get - AUTHORIZED -> [not allowed states: AUTHORIZED], throwing Errors', (done) => {
       try {
-        let sock = new EventEmitter();
-        let client = new notWSConnection({
+        sock = new EventEmitter();
+        sock.readyState = 0;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         expect(client.state).to.be.equal(CONST.STATE.NOT_CONNECTED);
@@ -835,8 +798,9 @@ describe('notWSConnection', () => {
 
     it('set/get - NO_PING -> NOT_CONNECTED, expecting reconnect call', (done) => {
       try {
-        let sock = new EventEmitter();
-        let client = new notWSConnection({
+        sock = new EventEmitter();
+        sock.readyState = 1;
+        client = new notWSConnection({
           ws: sock,
           state: 'offline',
           ip: '127.0.0.1'
@@ -845,7 +809,6 @@ describe('notWSConnection', () => {
           done();
         }
         client.requestServerTime = () => {};
-        client.state = CONST.STATE.CONNECTED;
         client.state = CONST.STATE.NO_PING;
         expect(client.state).to.be.equal(CONST.STATE.NO_PING);
         client.state = CONST.STATE.NOT_CONNECTED;
@@ -858,10 +821,10 @@ describe('notWSConnection', () => {
 
     it('set/get - NO_PING -> [not allowed states: CONNECTED, AUTHORIZED, ERRORED, NO_PING], throwing Errors', (done) => {
       try {
-        let sock = new EventEmitter();
-        let client = new notWSConnection({
+        sock = new EventEmitter();
+        sock.readyState = 0;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         expect(client.state).to.be.equal(CONST.STATE.NOT_CONNECTED);
@@ -895,18 +858,17 @@ describe('notWSConnection', () => {
 
     it('set/get - ERRORED -> NOT_CONNECTED, expecting reconnect call', (done) => {
       try {
-        let sock = new EventEmitter();
+        sock = new EventEmitter();
+        sock.readyState = 1;
         sock.terminate = function() {};
-        let client = new notWSConnection({
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         client.reconnect = () => {
           done();
         }
         client.disconnect = () => {};
-        client.state = CONST.STATE.CONNECTED;
         client.state = CONST.STATE.ERRORED;
         expect(client.state).to.be.equal(CONST.STATE.ERRORED);
         client.state = CONST.STATE.NOT_CONNECTED;
@@ -919,14 +881,13 @@ describe('notWSConnection', () => {
 
     it('set/get - ERRORED -> ERRORED, expecting diconnect call', (done) => {
       try {
-        let sock = new EventEmitter();
-        let client = new notWSConnection({
+        sock = new EventEmitter();
+        sock.readyState = 1;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         client.disconnect = () => {};
-        client.state = CONST.STATE.CONNECTED;
         client.state = CONST.STATE.ERRORED;
         expect(client.state).to.be.equal(CONST.STATE.ERRORED);
         client.state = CONST.STATE.ERRORED;
@@ -940,16 +901,15 @@ describe('notWSConnection', () => {
 
     it('set/get - ERRORED -> [not allowed states: CONNECTED, AUTHORIZED, NO_PING], throwing Errors', (done) => {
       try {
-        let sock = new EventEmitter();
-        let client = new notWSConnection({
+        sock = new EventEmitter();
+        sock.readyState = 0;
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
         expect(client.state).to.be.equal(CONST.STATE.NOT_CONNECTED);
         client.requestServerTime = () => {};
         client.disconnect = () => {};
-        client.state = CONST.STATE.CONNECTED;
         client.state = CONST.STATE.ERRORED;
         expect(client.state).to.be.equal(CONST.STATE.ERRORED);
         let throwing = [
@@ -976,17 +936,18 @@ describe('notWSConnection', () => {
 
 
   describe('message history', () => {
+    afterEach(()=>{
+      client.destroy();
+    });
     it('add to history; test history length cap', (done) => {
       try {
-        let sock = new EventEmitter();
+        sock = new EventEmitter();
         sock.terminate = () => {};
         sock.readyState = 1;
-        let client = new notWSConnection({
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1'
         });
-        client.state = CONST.STATE.CONNECTED;
         client.diconnect = () => {};
         client.reconnect = () => {};
         client.addToHistory({
@@ -1015,16 +976,13 @@ describe('notWSConnection', () => {
 
     it('send all from history', (done) => {
       try {
-        let sock = new EventEmitter();
+        sock = new EventEmitter();
         sock.terminate = () => {};
         sock.readyState = 1;
-        let client = new notWSConnection({
+        client = new notWSConnection({
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1',
         });
-
-        client.state = CONST.STATE.CONNECTED;
         client.diconnect = () => {};
         client.reconnect = () => {};
         client.addToHistory({

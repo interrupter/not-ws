@@ -2,7 +2,9 @@ const
   EventEmitter = require('events'),
   expect = require('chai').expect,
   CONST = require('../src/node/const.js'),
-  notWSServerClient = require('../src/node/server.client.js');
+  notWSServerClient = require('../src/node/client.js'),
+  notWSRouter = require('../src/node/router.js'),
+  notWSMessenger = require('../src/node/messenger.js');
 
 function getFakeMessenger(options) {
   let res = {};
@@ -18,16 +20,24 @@ function getFakeMessenger(options) {
   return res;
 }
 
+function getFakeMessengerAndRouter(){
+  return {
+    router: new notWSRouter({}),
+    messenger: new notWSMessenger({})
+  };
+}
+
 describe('notWSServerClient', () => {
   it('creating default', (done) => {
     try {
       let sock = new EventEmitter();
       sock.terminate = () => {};
       new notWSServerClient({
+        ...getFakeMessengerAndRouter(),
         connection: {
           ws: sock,
-          state: 'offline',
-        }
+        },
+        slave: true,
       });
       done();
     } catch (e) {
@@ -42,11 +52,12 @@ describe('notWSServerClient', () => {
       new notWSServerClient({
         connection: {
           ws: sock,
-          state: 'offline',
           ip: '127.0.0.1',
         },
+        slave: true,
         credentials: {},
-        name: 'test socket'
+        name: 'test socket',
+        ...getFakeMessengerAndRouter(),
       });
       done();
     } catch (e) {
@@ -60,11 +71,12 @@ describe('notWSServerClient', () => {
         let sock = new EventEmitter();
         sock.terminate = () => {};
         let client = new notWSServerClient({
+          ...getFakeMessengerAndRouter(),
           connection:{
             ws: sock,
-            state: 'offline',
             ip: '127.0.0.1',
           },
+          slave: true,
           credentials: {}
         });
         client.diconnect = () => {};
@@ -85,11 +97,12 @@ describe('notWSServerClient', () => {
         let sock = new EventEmitter();
         sock.terminate = () => {};
         let client = new notWSServerClient({
+          ...getFakeMessengerAndRouter(),
           connection:{
             ws: sock,
-            state: 'offline',
             ip: '127.0.0.1',
           },
+          slave: true,
           credentials: {}
         });
         client.reqChkStep = 10;
@@ -106,11 +119,12 @@ describe('notWSServerClient', () => {
         let sock = new EventEmitter();
         sock.terminate = () => {};
         let client = new notWSServerClient({
+          ...getFakeMessengerAndRouter(),
           connection:{
             ws: sock,
-            state: 'offline',
             ip: '127.0.0.1',
           },
+          slave: true,
           credentials: {}
         });
         client.requests = [{
@@ -135,11 +149,12 @@ describe('notWSServerClient', () => {
         let sock = new EventEmitter();
         sock.terminate = () => {};
         let client = new notWSServerClient({
+          ...getFakeMessengerAndRouter(),
           connection:{
             ws: sock,
-            state: 'offline',
             ip: '127.0.0.1',
           },
+          slave: true,
           credentials: {}
         });
         client.requests = [];
@@ -157,11 +172,12 @@ describe('notWSServerClient', () => {
         let sock = new EventEmitter();
         sock.terminate = () => {};
         let client = new notWSServerClient({
+          ...getFakeMessengerAndRouter(),
           connection:{
             ws: sock,
-            state: 'offline',
             ip: '127.0.0.1',
           },
+          slave: true,
           credentials: {}
         });
         client.checkRequests();
@@ -177,11 +193,12 @@ describe('notWSServerClient', () => {
         sock.terminate = () => {};
         sock.close = () => {};
         let client = new notWSServerClient({
+          ...getFakeMessengerAndRouter(),
           connection:{
             ws: sock,
-            state: 'offline',
             ip: '127.0.0.1',
           },
+          slave: true,
           credentials: {}
         });
         client.addRequest(1, () => {
@@ -207,11 +224,12 @@ describe('notWSServerClient', () => {
         sock.terminate = function() {};
         sock.close = function() {};
         let client = new notWSServerClient({
+          ...getFakeMessengerAndRouter(),
           connection:{
             ws: sock,
-            state: 'offline',
             ip: '127.0.0.1',
           },
+          slave: true,
           credentials: {}
         });
         client.disconnect = () => {};
@@ -256,11 +274,12 @@ describe('notWSServerClient', () => {
         sock.terminate = () => {};
         sock.close = () => {};
         let client = new notWSServerClient({
+          ...getFakeMessengerAndRouter(),
           connection:{
             ws: sock,
-            state: 'offline',
             ip: '127.0.0.1',
           },
+          slave: true,
           credentials: {}
         });
         let checked = 0;
@@ -296,9 +315,10 @@ describe('notWSServerClient', () => {
       try {
         let sock = new EventEmitter();
         let client = new notWSServerClient({
+          ...getFakeMessengerAndRouter(),
+          slave: true,
           connection:{
             ws: sock,
-            state: 'offline',
             ip: '127.0.0.1',
           },
           credentials: {}
@@ -320,11 +340,12 @@ describe('notWSServerClient', () => {
       try {
         let sock = new EventEmitter();
         let client = new notWSServerClient({
+          ...getFakeMessengerAndRouter(),
           connection:{
             ws: sock,
-            state: 'offline',
             ip: '127.0.0.1',
           },
+          slave: true,
           credentials: {}
         });
         client.requestServerTime();
@@ -338,20 +359,20 @@ describe('notWSServerClient', () => {
       try {
         let errorName = 'Test error!';
         let sock = new EventEmitter();
+        sock.readyState = 1;
         let client = new notWSServerClient({
+          ...getFakeMessengerAndRouter(),
           connection:{
             ws: sock,
-            state: 'offline',
             ip: '127.0.0.1',
           },
+          slave: true,
           credentials: {}
         });
         sock.terminate = () => {};
-        sock.readyState = 1;
-        client.connection.state = CONST.STATE.CONNECTED;
         client.connection.isConnected = () => true;
-        client.request = async () => {
-          throw new Error(errorName);
+        client.request = () => {
+          return Promise.reject(new Error(errorName));
         };
         expect(client.connection.isConnected()).to.be.ok;
         client.logError = (err) => {
@@ -368,17 +389,17 @@ describe('notWSServerClient', () => {
     it('requestServerTime - when connected, response is ok', (done) => {
       try {
         let sock = new EventEmitter();
+        sock.readyState = 1;
         let client = new notWSServerClient({
+          ...getFakeMessengerAndRouter(),
           connection:{
             ws: sock,
-            state: 'offline',
             ip: '127.0.0.1',
           },
+          slave: true,
           credentials: {}
         });
         sock.terminate = () => {};
-        sock.readyState = 1;
-        client.state = CONST.STATE.CONNECTED;
         client.request = async (name, data, secure) => {
           return Date.now() - 2000;
         };

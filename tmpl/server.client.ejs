@@ -3,9 +3,10 @@ const JWT = require('jsonwebtoken');
 const CONST = require('./const.js');
 const Func = require('./func.js');
 
+const notWSRouter = require('./router.js');
+const notWSMessenger = require('./messenger.js');
 const notWSConnection = require('./connection.js');
 
-const TIME_OFFSET_REQUEST_INTERVAL = 5 * 60 * 1000;
 /**
  *  Инкапсулирует обработку соединения пользователя
  *
@@ -14,23 +15,37 @@ const TIME_OFFSET_REQUEST_INTERVAL = 5 * 60 * 1000;
 class notWSServerClient extends EventEmitter {
 	constructor({
 		name,
-		identity,					//user information
-		credentials,			//client creds for access
-		connection,				//{ws, ip, secure, state}
+    connection,				//{ ws, ip, secure }
 		messenger, 				//экземпляр notWSMessage подобного класса, с упаковщиками нужного типа,
 		router,
-		logger
+		logger,
+    identity,					//user information
+		credentials			  //client creds for access
 	}) {
+    if(!router || !(router instanceof notWSRouter)){
+      throw new Error('Router is not set or is not instance of notWSRouter');
+    }
+    if(!messenger || !(messenger instanceof notWSMessenger)){
+      throw new Error('Messenger is not set or is not instance of notWSMessenger');
+    }
 		super();
 		//basic params
 		this.__name = name ? name : CONST.DEFAULT_CLIENT_NAME;
+    //jwt
+    this.jwtToken = null; //Токен авторизации.
+    this.jwtExpire = null; //Время до истечения токена.
+    this.jwtDate = null; //Дата создания токена.
+    //setting envs
 		this.identity = identity;
 		this.credentials = credentials;
-		this.initConnection(connection);
-		this.messenger = messenger;
+    this.messenger = messenger;
 		this.router = router;
+    //Подключение к WS
+		this.initConnection(connection);
+    this.router.on('updateToken', this.renewToken.bind(this));
 		//common constructor part for client browser client, node client, node server client
 		<%- include('./client.common.constructor.ejs'); %>
+    this.connect();
 		return this;
 	}
 
@@ -53,6 +68,11 @@ class notWSServerClient extends EventEmitter {
       this.logError(e);
     });
     this.connection.on('message', this.processMessage.bind(this));
+
+    this.connection.on('ready', ()=>{
+      this.logMsg('ready');
+      this.emit('ready', this);
+    });
   }
 
 	processMessage(data) {
@@ -73,6 +93,50 @@ class notWSServerClient extends EventEmitter {
 		}
 	}
 
+  selectRoute(msg){
+		switch(msg.service.type){
+		//couple of special types
+		case CONST.MSG_TYPE.RESPONSE: this.routeResponse(msg);  break;
+		case CONST.MSG_TYPE.REQUEST: 	this.routeRequest(msg);  break;
+		case CONST.MSG_TYPE.EVENT:    this.routeEvent(msg);     break;
+			//all other
+		default:                      this.routeCommon(msg);
+		}
+	}
+
+	routeResponse(msg){
+		let request = this.fullfillRequest(msg.service.id);
+		if(request !== null){
+			request.cb(msg);
+		}
+	}
+
+	routeEvent(msg){
+		this.router.route(msg.service, msg.payload, this.connection.getSocket())
+			.catch((e)=>{
+				this.logError(e);
+			});
+	}
+
+	routeCommon(msg){
+		this.router.route(msg.service, msg.payload, this.connection.getSocket())
+			.catch((e)=>{
+				this.logError(e);
+				this.respond({}, {id: msg.service.id, type: CONST.MSG_TYPE.RESPONSE, name: msg.service.name}, e);
+			});
+	}
+
+	routeRequest(msg){
+		this.router.route(msg.service, msg.payload, this.connection.getSocket())
+			.then((responseData)=>{
+				this.respond(responseData, {id: msg.service.id, type: CONST.MSG_TYPE.RESPONSE, name: msg.service.name});
+			})
+			.catch((e)=>{
+				this.logError(e);
+				this.respond({}, {id: msg.service.id, type: CONST.MSG_TYPE.RESPONSE, name: msg.service.name}, e);
+			});
+	}
+
 	suicide() {
 		this.emit('errored', this);
 	}
@@ -81,8 +145,16 @@ class notWSServerClient extends EventEmitter {
 		this.connection.disconnect();
 	}
 
+  terminate() {
+		this.connection.terminate();
+	}
+
 	isDead() {
-		return this.connection.isDead();
+		return !this.connection.isAlive();
+	}
+
+  isAlive() {
+		return this.connection.isAlive();
 	}
 
 	reconnect() {
@@ -130,6 +202,10 @@ class notWSServerClient extends EventEmitter {
 			return false;
 		}
 	}
+
+  renewToken(){}
+
+  connect(){}
 
 	respond(resp, service = {}, error){
 		if(typeof resp === 'object' && resp !== null){
@@ -234,7 +310,7 @@ class notWSServerClient extends EventEmitter {
       this.getTimeOffsetInt = null;
     }
     this.requestServerTime();
-    this.getTimeOffsetInt = setInterval(this.requestServerTime.bind(this), TIME_OFFSET_REQUEST_INTERVAL);
+    this.getTimeOffsetInt = setInterval(this.requestServerTime.bind(this), CONST.TIME_OFFSET_REQUEST_INTERVAL);
   }
 }
 

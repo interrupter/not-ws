@@ -11,11 +11,13 @@
   <script>
     const client = new notWSClient({
       options: {
-        host: 'localhost',
-        port: 12000,
-        path: '',
-        secure: false,
-        ping: true
+        connection:{
+          host: 'localhost',
+          port: 12000,
+          path: '',
+          secure: false,
+          ping: true
+        }
       }
     });
     client.once('ready', ()=>{

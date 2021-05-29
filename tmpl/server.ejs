@@ -7,7 +7,7 @@ const CONST = require('./const.js');
 const Func = require('./func.js');
 const notWSRouter = require('./router.js');
 
-const notWSServerClient = require('./server.client.js');
+const notWSClient = require('./client.js');
 const notWSMessage = require('./messenger.js');
 
 const DEFAULT_OPTIONS = {
@@ -52,7 +52,7 @@ class notWSServer extends EventEmitter{
     this.isClosing   = false;
     this.wsClients  = [];
     this.wsMaxConns = 100;
-    this.clientRouter = new notWSRouter({}, this.options.routes);
+    this.clientRouter = new notWSRouter({routes: this.options.routes});
     this.intPingPong = null;
     return this;
   }
@@ -74,6 +74,7 @@ class notWSServer extends EventEmitter{
         this.initPingPong();
       }
       this.initServer();
+      this.emit('started');
     }else{
       throw new Error('No host, port or server object for start.');
     }
@@ -116,7 +117,7 @@ class notWSServer extends EventEmitter{
       this.logMsg('decoded token', decoded);
       return !decoded.active;
     } catch(err) {
-      this.logError(err);
+      this.logDebug(err);
       if(err.name === 'TokenExpiredError'){
         this.logError('Client must update token');
       }
@@ -146,20 +147,21 @@ class notWSServer extends EventEmitter{
 				return;
       }
     }
-    let wsConn = new notWSServerClient({
+    let wsConn = new notWSClient({
       identity:     this.getClientIdentity(req),
-      socket:       connection,
-      state:        'online',
-      ip:           req.socket.remoteAddress,
+      slave:        true,
+      connection:{
+        ping:         false,
+        ws:           connection,
+        state:        'online',
+        ip:           req.socket.remoteAddress,
+      },
       credentials:  Object.assign({}, this.options.credentials),
       messenger:    this.getMessengerForClient(connection, req),
       router:       this.getRouterForClient(connection, req)
     });
     this.emit('connection', wsConn, req);
-    if(this.options.ping){
-      wsConn.on('pong', Func.heartbeat);
-    }
-    wsConn.once('errored', this.terminateAndRemoveWSClient.bind(this));
+    wsConn.connection.once('errored', this.terminateAndRemoveWSClient.bind(this));
     if(Object.prototype.hasOwnProperty.call(this.options,'events') &&
       Object.prototype.hasOwnProperty.call(this.options.events,'onmessage' &&
       Func.isFunc(this.options.events.onmessage)
@@ -267,10 +269,6 @@ class notWSServer extends EventEmitter{
 
 	pingOne(client){
 		//this.logDebug(`ping client`, client.ip);
-		if (client.isAlive === false){
-			return client.terminate();
-		}
-		client.isAlive = false;
 		client.ping();
 	}
 

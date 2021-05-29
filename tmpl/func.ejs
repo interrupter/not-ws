@@ -4,7 +4,7 @@ function isFunc(func){
 }
 
 function noop() {}
-function heartbeat() { this.isAlive = true;}
+function heartbeat() { this._alive = true;}
 
 function ObjHas(obj, prop){
   return Object.prototype.hasOwnProperty.call(obj, prop);

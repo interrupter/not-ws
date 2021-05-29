@@ -20,8 +20,6 @@
 *
 **/
 
-const TIME_OFFSET_REQUEST_INTERVAL = 5 * 60 * 1000;
-
 class notWSClient extends EventEmitter{
   constructor({
     name,
@@ -29,7 +27,9 @@ class notWSClient extends EventEmitter{
     getToken,
     messenger,
     router,
-    logger
+    logger,
+    identity,					//user information
+		credentials			  //client creds for access
   }){
     if(!router || !(router instanceof notWSRouter)){
       throw new Error('Router is not set or is not instance of notWSRouter');
@@ -39,19 +39,24 @@ class notWSClient extends EventEmitter{
     }
     super();
     //Основные параметры
-    this.__name = name || 'WSClient';
+    this.__name = name ? name : CONST.DEFAULT_CLIENT_NAME;
     //jwt
     this.jwtToken = null; //Токен авторизации.
     this.jwtExpire = null; //Время до истечения токена.
     this.jwtDate = null; //Дата создания токена.
-    //Подключение к WS
-    this.initConnection(connection);
+    //setting envs
     this.tokenGetter = getToken;
+    this.identity = identity;
+		this.credentials = credentials;
     this.messenger = messenger;
     this.router =   router;
+    //Подключение к WS
+    this.initConnection(connection);
     this.router.on('updateToken', this.renewToken.bind(this));
+    //common constructor part for client browser client, node client, node server client
     <%- include('./client.common.constructor.ejs') %>
     this.connect();
+    return this;
   }
 
   initConnection(connection){
@@ -73,20 +78,39 @@ class notWSClient extends EventEmitter{
       this.logError(e);
     });
     this.connection.on('message', this.processMessage.bind(this));
+
+    this.connection.on('ready', ()=>{
+      this.logMsg('ready');
+      this.emit('ready', this);
+    });
   }
 
   async connect(){
     try{
-      //если нужна аутентификация
-      if(this.connection.isSecure()){
-        //получаем и сохраняем токен токен
-        this.saveToken(await this.getToken());
+      if(!this.isConnected()){
+        //если нужна аутентификация
+        if(this.connection.isSecure()){
+          //получаем и сохраняем токен токен
+          this.saveToken(await this.getToken());
+        }
+        //подключаемся
+        this.connection.connect();
       }
-      //подключаемся
-      this.connection.connect();
     }catch(e){
       this.logError(e);
     }
+  }
+
+  disconnect(){
+    this.connection.disconnect();
+  }
+
+  terminate(){
+    this.connection.terminate();
+  }
+
+  reconnect(){
+    this.connection.reconnect();
   }
 
   //Получение токена.
@@ -154,39 +178,48 @@ class notWSClient extends EventEmitter{
   }
 
   selectRoute(msg){
-    switch(msg.service.type){
-      //couple of special types
-      case CONST.MSG_TYPE.RESPONSE: this.routeResponse(msg);  break;
-      case CONST.MSG_TYPE.EVENT:    this.routeEvent(msg);     break;
-      //all other
-      default:                      this.routeCommon(msg);
-    }
-  }
+		switch(msg.service.type){
+		//couple of special types
+		case CONST.MSG_TYPE.RESPONSE: this.routeResponse(msg);  break;
+		case CONST.MSG_TYPE.REQUEST: 	this.routeRequest(msg);  break;
+		case CONST.MSG_TYPE.EVENT:    this.routeEvent(msg);     break;
+			//all other
+		default:                      this.routeCommon(msg);
+		}
+	}
 
-  routeResponse(msg){
-    let request = this.fullfillRequest(msg.service.id);
-    if(request !== null){
-      request.cb(msg);
-    }
-  }
+	routeResponse(msg){
+		let request = this.fullfillRequest(msg.service.id);
+		if(request !== null){
+			request.cb(msg);
+		}
+	}
 
-  routeEvent(msg){
-    this.router.route(msg.service, msg.payload, this.connection.getSocket())
-      .catch((e)=>{
-        this.logError(e);
-      });
-  }
+	routeEvent(msg){
+		this.router.route(msg.service, msg.payload, this.connection.getSocket())
+			.catch((e)=>{
+				this.logError(e);
+			});
+	}
 
-  routeCommon(msg){
-    this.router.route(msg.service, msg.payload, this.connection.getSocket())
-      .then((responseData)=>{
-        this.respond(responseData, {id: msg.service.id, type: CONST.MSG_TYPE.RESPONSE, name: msg.service.name});
-      })
-      .catch((e)=>{
-        this.logError(e);
-        this.respond({}, {id: msg.service.id, type: CONST.MSG_TYPE.RESPONSE, name: msg.service.name}, e);
-      });
-  }
+	routeCommon(msg){
+		this.router.route(msg.service, msg.payload, this.connection.getSocket())
+			.catch((e)=>{
+				this.logError(e);
+				this.respond({}, {id: msg.service.id, type: CONST.MSG_TYPE.RESPONSE, name: msg.service.name}, e);
+			});
+	}
+
+	routeRequest(msg){
+		this.router.route(msg.service, msg.payload, this.connection.getSocket())
+			.then((responseData)=>{
+				this.respond(responseData, {id: msg.service.id, type: CONST.MSG_TYPE.RESPONSE, name: msg.service.name});
+			})
+			.catch((e)=>{
+				this.logError(e);
+				this.respond({}, {id: msg.service.id, type: CONST.MSG_TYPE.RESPONSE, name: msg.service.name}, e);
+			});
+	}
 
   respond(resp, service = {}, error){
     if(resp && typeof resp === 'object' && resp !== null){
@@ -255,7 +288,11 @@ class notWSClient extends EventEmitter{
   }
 
   isDead() {
-		return this.connection.isDead();
+		return !this.connection.isAlive();
+	}
+
+  isAlive() {
+		return this.connection.isAlive();
 	}
 
   isAutoReconnect(){
@@ -301,7 +338,7 @@ class notWSClient extends EventEmitter{
       this.getTimeOffsetInt = null;
     }
     this.requestServerTime();
-    this.getTimeOffsetInt = setInterval(this.requestServerTime.bind(this), TIME_OFFSET_REQUEST_INTERVAL);
+    this.getTimeOffsetInt = setInterval(this.requestServerTime.bind(this), CONST.TIME_OFFSET_REQUEST_INTERVAL);
   }
 
   //набор методов для работы с запросами и выявления безответных

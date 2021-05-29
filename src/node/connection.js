@@ -19,37 +19,36 @@ const DEFAULT_OPTIONS = {
 };
 
 class notWSConnection extends EventEmitter{
-	constructor(options){
+	constructor(options, slave = false){
 		super();
 		this.options = Object.assign({}, DEFAULT_OPTIONS, options);
 		if(this.options.ws){
 			this.ws = options.ws;
-			this.isAlive = true; //результат пинг запросов
 			delete options.ws;
+			if(this.ws.readyState === 1){
+				this.setAlive(); //результат пинг запросов
+				this[SYMBOL_STATE] = CONST.STATE.CONNECTED;
+			}else{
+				this[SYMBOL_STATE] = CONST.STATE.NOT_CONNECTED;
+				this.setDead(); //результат пинг запросов
+			}
 		}else{
-			this.isAlive = false; //результат пинг запросов
+			this[SYMBOL_STATE] = CONST.STATE.NOT_CONNECTED;
+			this.setDead(); //результат пинг запросов
 			this.ws = null; //Подключение к websocket серверу.
 		}
+		this[SYMBOL_ACTIVITY] = CONST.ACTIVITY.IDLE;
 		//if was terminated
 		this.isTerminated = false;
 		this.isReconnecting = false;
 		this.closing = false;
+		this.slave = slave;
 		this.heartbeatTimeout = null;
 		this.connectInterval = null;
 		this.connCount = 0; //Количество неудачных попыток подключения к websocket серверу.
 		this.connCountMax = 10; //Количество попыток по превышении которого считаем что соединение с серверов разорвано.
 		this.errConnMsg = null; //Идентификатор сообщения об ошибке подключения к вебсокет серверу.
 		this.firstConn = true;
-
-
-		//connection state and current activity
-		if(this.options.state === 'online'){
-			this[SYMBOL_STATE] = CONST.STATE.CONNECTED;
-		}else{
-			this[SYMBOL_STATE] = CONST.STATE.NOT_CONNECTED;
-		}
-		this[SYMBOL_ACTIVITY] = CONST.ACTIVITY.IDLE;
-
 		this.bindEnvEvents();
 		this.bindSocketEvents();
 		//message history
@@ -57,25 +56,37 @@ class notWSConnection extends EventEmitter{
 		return this;
 	}
 
+	getStatus(){
+		return {
+			state:          CONST.STATE_NAME[this[SYMBOL_STATE]],
+			activity:       CONST.ACTIVITY_NAME[this[SYMBOL_ACTIVITY]],
+			isAlive:        this.isAlive(),
+			isTerminated:   this.isTerminated,
+			isReconnecting: this.isReconnecting,
+		};
+	}
+
 	getSocket(){
 		return this.ws;
 	}
 
 	bindSocketEvents(){
+		if(this.ws){
     
-		//events binding to client socket
-		this.listeners = {
-			open: this.onOpen.bind(this),
-			message: this.onMessage.bind(this),
-			close: this.onClose.bind(this),
-			error: this.onError.bind(this)
-		};
-		this.ws.on('open', this.listeners.open);
-		this.ws.on('message', this.listeners.message);
-		this.ws.on('close', this.listeners.close);
-		this.ws.on('error', this.listeners.error);
-		this.ws.on('pong', this.onPong.bind(this));
+			//events binding to client socket
+			this.listeners = {
+				open: this.onOpen.bind(this),
+				message: this.onMessage.bind(this),
+				close: this.onClose.bind(this),
+				error: this.onError.bind(this)
+			};
+			this.ws.on('open', this.listeners.open);
+			this.ws.on('message', this.listeners.message);
+			this.ws.on('close', this.listeners.close);
+			this.ws.on('error', this.listeners.error);
+			this.ws.on('pong', this.onPong.bind(this));
     
+		}
 	}
 
 
@@ -97,7 +108,6 @@ class notWSConnection extends EventEmitter{
 			//закрываем подключение.
 			this.ws.close && this.ws.close();
 			this.terminate();
-			this.emit('disconnected');
 		}
 	}
 
@@ -117,9 +127,10 @@ class notWSConnection extends EventEmitter{
 		}
 		this.isTerminated = true;
 		this.ws = null;
-		if(this.state!==CONST.STATE.NOT_CONNECTED){
+		if(this.state !== CONST.STATE.NOT_CONNECTED){
 			this.state = CONST.STATE.NOT_CONNECTED;
 		}
+		this.setDead();
 	}
 
 	//Подключение к websocket сервису.
@@ -128,7 +139,8 @@ class notWSConnection extends EventEmitter{
 			if(this.ws && (this.ws.readyState !== WebSocket.CLOSED)){
 				this.disconnect();
 			}
-			this.isAlive = true;
+			this.setAlive();
+			this.isTerminated = false;
 			this.emit('connecting');
 			//Счётчик колиества попыток подключения:
 			this.connCount++;
@@ -136,14 +148,41 @@ class notWSConnection extends EventEmitter{
 			let connURI = this.getConnectURI();
 			this.emit('connectURI', connURI);
 			this.ws = new WebSocket(connURI);
-      
-			this.ws.on('open', this.onOpen.bind(this));
-			this.ws.on('error', this.onError.bind(this));
-      
+			this.bindSocketEvents();
 		}catch(e){
 			this.emit('error',e);
 			this.scheduleReconnect();
 		}
+	}
+
+	setHalfDead(){
+		if(this._alive){
+			this._alive = false;
+		}else{
+			this.setDead();
+		}
+	}
+
+	setHalfAlive(){
+		this._alive = true;
+		this.setAlive();
+	}
+
+	setAlive(){
+		this._alive = true;
+		this.alive = true;
+	}
+
+	setDead(){
+		this.alive = false;
+	}
+
+	isAlive(){
+		return this.alive;
+	}
+
+	isDead(){
+		return !this.alive;
 	}
 
 	getConnectURI(){
@@ -173,19 +212,19 @@ class notWSConnection extends EventEmitter{
 	}
 
 	onOpen(){
-		this.emit('connected');
 		//Сбрасываем счётчик количества попыток подключения и данные об ошибках.
 		this.connCount = 0;
-		this.isAlive = true;
+		this.setAlive();
 		clearInterval(this.connectInterval);
 		this.connectInterval = false;
 		this.errConnMsg = null;
-    
-		this.ws.on('message', this.onMessage.bind(this));
-		this.ws.on('close', this.onClose.bind(this));
-    
+		this.state = CONST.STATE.CONNECTED;
+		if(this.isSecure()){
+			this.state = CONST.STATE.AUTHORIZED;
+		}
 		this.initPing();
 		this.emit('ready');
+		this.sendAllFromHistory();
 	}
 
 	//Обработчик сообщений пришедших от сервера.
@@ -212,7 +251,6 @@ class notWSConnection extends EventEmitter{
 	}
 
 	onError(err){
-		this.emit('disconnected');
 		if(this.connectInterval){
 			clearInterval(this.connectInterval);
 			this.connectInterval = false;
@@ -227,7 +265,6 @@ class notWSConnection extends EventEmitter{
 
 	//Обработчик закрытия подключения.
 	onClose(event){
-		this.emit('disconnected');
 		if (typeof event.code !== 'undefined') {
 			let reason = `${event.code}::` + CONST.mapWsCloseCodes(event);
 			this.emit('close', reason);
@@ -263,29 +300,33 @@ class notWSConnection extends EventEmitter{
 	}
 
 	scheduleReconnect(){
-		let timeout = this.getReconnectTimeout();
-		this.emit('reconnectioningEvery', timeout);
-		if (this.connectInterval){
-			clearInterval(this.connectInterval);
-		}
-		this.connectInterval = setInterval(
-			()=>{
-				if(this.isAlive === false){
-					if(this.ws.readyState === this.ws.CLOSED){
-						this.connect();
+		if(!this.slave){
+			let timeout = this.getReconnectTimeout();
+			this.emit('reconnectioningEvery', timeout);
+			if (this.connectInterval){
+				clearInterval(this.connectInterval);
+			}
+			this.connectInterval = setInterval(
+				()=>{
+					if(this.isAlive()){
+						if((!this.ws) || (this.ws.readyState === this.ws.CLOSED)){
+							this.connect();
+						}
 					}
-				}
-			},
-			timeout
-		);
+				},
+				timeout
+			);
+		}
 	}
 
 	reconnect() {
-		if ([CONST.ACTIVITY.CONNECTING].indexOf(this.activity) > -1) {
-			this.emit('concurentActivity', CONST.ACTIVITY[this.activity]);
-			return;
-		} else {
-			this.scheduleReconnect();
+		if(!this.slave){
+			if ([CONST.ACTIVITY.CONNECTING].indexOf(this.activity) > -1) {
+				this.emit('concurentActivity', CONST.ACTIVITY[this.activity]);
+				return;
+			} else {
+				this.scheduleReconnect();
+			}
 		}
 	}
 
@@ -297,10 +338,14 @@ class notWSConnection extends EventEmitter{
 	}
 
 	isAutoReconnect(){
-		if (typeof this.options.reconnect !== 'undefined'){
-			return this.options.reconnect;
+		if(this.slave){
+			return false;
 		}else{
-			return CONST.CLIENT_AUTO_RECONNECT;
+			if (typeof this.options.reconnect !== 'undefined'){
+				return this.options.reconnect;
+			}else{
+				return CONST.CLIENT_AUTO_RECONNECT;
+			}
 		}
 	}
 
@@ -310,7 +355,7 @@ class notWSConnection extends EventEmitter{
    *  @params {boolean} secure      if user should be connected and authenticated
    */
 	isConnected(secure = true){
-		if(this.ws && this.isAlive){
+		if(this.ws && this.isAlive()){
 			if(secure){
 				return this.isConnectionSecure();
 			}else{
@@ -329,18 +374,27 @@ class notWSConnection extends EventEmitter{
 		return (this.state === state) && (this.ws.readyState === 1); // 1- OPEN
 	}
 
-	isDead() {
-		return this.isTerminated;
+	isOpen(){
+		return this.ws && this.ws.readyState === 1;
 	}
 
+	isMessageTokenUpdateRequest(data){
+		return data.type === '__service' && data.name === 'updateToken';
+	}
 
 	initPing(){
-		if(this.options.ping){
-			if(this.intPing){
-				clearInterval(this.intPing);
-				this.intPing = false;
+		//if server side client, only react on pong
+		if(this.slave){
+			this.on('pong', Func.heartbeat);
+		}else{
+			//if client send ping requests
+			if(this.options.ping){
+				if(this.pingInterval){
+					clearInterval(this.pingInterval);
+					this.pingInterval = false;
+				}
+				this.pingInterval = setInterval(this.sendPing.bind(this), this.options.pingTimeout || CONST.PING_TIMEOUT);
 			}
-			this.intPing = setInterval(this.sendPing.bind(this), this.options.pingTimeout || CONST.PING_TIMEOUT);
 		}
 	}
 
@@ -348,13 +402,13 @@ class notWSConnection extends EventEmitter{
   * If not connected, reconnects, else sets connection isNotAlive and sends ping
   */
 	sendPing(){
-		if(this.isAlive === false){
+		if(!this.isAlive()){
 			this.emit('noPong');
 			this.disconnect();
 			this.scheduleReconnect();
 			return;
 		}
-		this.isAlive = false;
+		this.setHalfDead();
 		this.ping();
 	}
 
@@ -363,9 +417,10 @@ class notWSConnection extends EventEmitter{
   */
 	ping(){
 		if(this.ws){
-			
+      
 			this.ws.ping(Func.noop);
       
+			this.emit('ping');
 		}
 	}
 
@@ -376,7 +431,8 @@ class notWSConnection extends EventEmitter{
   **/
 	checkPingMsg(msg){
 		if (msg === 'pong'){
-			this.isAlive = true;
+			this.setHalfAlive();
+			this.emit('pong');
 			return true;
 		}
 		return false;
@@ -384,9 +440,10 @@ class notWSConnection extends EventEmitter{
 
   
 	/**
-	*	Proxy for WebSocket event
-	*/
+  *  Proxy for WebSocket event
+  */
 	onPong(){
+		this.setHalfAlive();
 		this.emit('pong');
 	}
   
@@ -402,7 +459,7 @@ class notWSConnection extends EventEmitter{
 		//Проверяем что клиент подключен
 		return new Promise((resolve, reject) => {
 			try {
-				if (this.isConnected(secure)) {
+				if (this.isConnected(secure) || (this.isOpen() && this.isMessageTokenUpdateRequest(data))) {
 					//Пытаемся отправить сообщение клиенту.
 					this.ws.send(JSON.stringify(data), (err) => {
 						if (err) {
@@ -477,9 +534,6 @@ class notWSConnection extends EventEmitter{
 				} else {
 					throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
 				}
-				if (state === CONST.STATE.AUTHORIZED) {
-					this.emit('authorized');
-				}
 				break;
 				//можем потерять авторизацию, но продолжить висеть на линии
 				//повиснуть
@@ -521,18 +575,25 @@ class notWSConnection extends EventEmitter{
 				}
 				break;
 			}
-			if ([CONST.STATE.ERRORED, CONST.STATE.NO_PING].indexOf(state) > -1) {
-				if(CONST.STATE.ERRORED === state){
-					this.emit('errored');
-				}else{
-					this.emit('noPing');
+			switch(this[SYMBOL_STATE]){
+			case CONST.STATE.NOT_CONNECTED:
+				//если идём на обрыв, то переподключение не запускаем
+				this.emit('disconnected');
+				if(this.isAlive()){
+					this.emit('beforeReconnect');
+					this.reconnect();
 				}
+				break;
+			case CONST.STATE.CONNECTED:  this.emit('connected');        break;
+			case CONST.STATE.AUTHORIZED:  this.emit('authorized');      break;
+			case CONST.STATE.NO_PING:
+				this.emit('noPing');
 				this.disconnectTimeout = setTimeout(this.disconnect.bind(this), 100);
-			}
-			//если идём на обрыв, то переподключение не запускаем
-			if ((CONST.STATE.NOT_CONNECTED === state) && (!this.isDead())) {
-				this.emit('beforeReconnect');
-				this.reconnect();
+				break;
+			case CONST.STATE.ERRORED:
+				this.emit('errored');
+				this.disconnectTimeout = setTimeout(this.disconnect.bind(this), 100);
+				break;
 			}
 			return true;
 		} else {
@@ -586,6 +647,12 @@ AUTHORIZING: 4
 		} else {
 			throw new Error('set: Unknown notWSServerClient activity: ' + activity);
 		}
+	}
+
+	destroy(){
+		clearInterval(this.connectInterval);
+		clearInterval(this.pingInterval);
+		clearTimeout(this.disconnectTimeout);
 	}
 }
 

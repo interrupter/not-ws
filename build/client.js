@@ -570,10 +570,11 @@ var notWSClient = (function () {
 	  MSG_TYPE_IS_NOT_VALID: 'Message Type is not valid!',
 	  MSG_NAME_IS_NOT_VALID: 'Message Name is not valid!'
 	};
-	const PING_TIMEOUT = 30000;
-	const HEARTBEAT_INTERVAL = 30000;
+	const PING_TIMEOUT = 5000;
+	const HEARTBEAT_INTERVAL = 5000;
 	const CLIENT_RECONNECT_TIMEOUT = 5000;
 	const CLIENT_RECONNECT_TIMEOUT_LONG = 30000;
+	const TIME_OFFSET_REQUEST_INTERVAL = 5 * 60 * 1000;
 	const CLIENT_AUTO_RECONNECT = true;
 	const TOKEN_TTL = 1800;
 	const TOKEN_RENEW_TTL = 300;
@@ -605,6 +606,7 @@ var notWSClient = (function () {
 	  CLIENT_RECONNECT_TIMEOUT,
 	  CLIENT_RECONNECT_TIMEOUT_LONG,
 	  CLIENT_AUTO_RECONNECT,
+	  TIME_OFFSET_REQUEST_INTERVAL,
 	  MSG_TYPE,
 	  TOKEN_TTL,
 	  TOKEN_RENEW_TTL
@@ -618,7 +620,7 @@ var notWSClient = (function () {
 	function noop() {}
 
 	function heartbeat() {
-	  this.isAlive = true;
+	  this._alive = true;
 	}
 
 	function ObjHas(obj, prop) {
@@ -7648,25 +7650,35 @@ var notWSClient = (function () {
 	};
 
 	class notWSConnection extends EventEmitter {
-	  constructor(options) {
+	  constructor(options, slave = false) {
 	    super();
 	    this.options = Object.assign({}, DEFAULT_OPTIONS$1, options);
 
 	    if (this.options.ws) {
 	      this.ws = options.ws;
-	      this.isAlive = true; //результат пинг запросов
-
 	      delete options.ws;
+
+	      if (this.ws.readyState === 1) {
+	        this.setAlive(); //результат пинг запросов
+
+	        this[SYMBOL_STATE$1] = CONST.STATE.CONNECTED;
+	      } else {
+	        this[SYMBOL_STATE$1] = CONST.STATE.NOT_CONNECTED;
+	        this.setDead(); //результат пинг запросов
+	      }
 	    } else {
-	      this.isAlive = false; //результат пинг запросов
+	      this[SYMBOL_STATE$1] = CONST.STATE.NOT_CONNECTED;
+	      this.setDead(); //результат пинг запросов
 
 	      this.ws = null; //Подключение к websocket серверу.
-	    } //if was terminated
+	    }
 
+	    this[SYMBOL_ACTIVITY$1] = CONST.ACTIVITY.IDLE; //if was terminated
 
 	    this.isTerminated = false;
 	    this.isReconnecting = false;
 	    this.closing = false;
+	    this.slave = slave;
 	    this.heartbeatTimeout = null;
 	    this.connectInterval = null;
 	    this.connCount = 0; //Количество неудачных попыток подключения к websocket серверу.
@@ -7675,15 +7687,7 @@ var notWSClient = (function () {
 
 	    this.errConnMsg = null; //Идентификатор сообщения об ошибке подключения к вебсокет серверу.
 
-	    this.firstConn = true; //connection state and current activity
-
-	    if (this.options.state === 'online') {
-	      this[SYMBOL_STATE$1] = CONST.STATE.CONNECTED;
-	    } else {
-	      this[SYMBOL_STATE$1] = CONST.STATE.NOT_CONNECTED;
-	    }
-
-	    this[SYMBOL_ACTIVITY$1] = CONST.ACTIVITY.IDLE;
+	    this.firstConn = true;
 	    this.bindEnvEvents();
 	    this.bindSocketEvents(); //message history
 
@@ -7691,11 +7695,26 @@ var notWSClient = (function () {
 	    return this;
 	  }
 
+	  getStatus() {
+	    return {
+	      state: CONST.STATE_NAME[this[SYMBOL_STATE$1]],
+	      activity: CONST.ACTIVITY_NAME[this[SYMBOL_ACTIVITY$1]],
+	      isAlive: this.isAlive(),
+	      isTerminated: this.isTerminated,
+	      isReconnecting: this.isReconnecting
+	    };
+	  }
+
 	  getSocket() {
 	    return this.ws;
 	  }
 
-	  bindSocketEvents() {}
+	  bindSocketEvents() {
+	    if (this.ws) {
+	      this.ws.onopen = this.onOpen.bind(this);
+	      this.ws.error = this.onError.bind(this);
+	    }
+	  }
 
 	  bindEnvEvents() {
 	    window.onunload = this.disconnect.bind(this);
@@ -7712,7 +7731,6 @@ var notWSClient = (function () {
 
 	      this.ws.close && this.ws.close();
 	      this.terminate();
-	      this.emit('disconnected');
 	    }
 	  }
 
@@ -7732,6 +7750,8 @@ var notWSClient = (function () {
 	    if (this.state !== CONST.STATE.NOT_CONNECTED) {
 	      this.state = CONST.STATE.NOT_CONNECTED;
 	    }
+
+	    this.setDead();
 	  } //Подключение к websocket сервису.
 
 
@@ -7741,7 +7761,8 @@ var notWSClient = (function () {
 	        this.disconnect();
 	      }
 
-	      this.isAlive = true;
+	      this.setAlive();
+	      this.isTerminated = false;
 	      this.emit('connecting'); //Счётчик колиества попыток подключения:
 
 	      this.connCount++; //пытаемся подключиться к вебсокет сервису.
@@ -7749,12 +7770,41 @@ var notWSClient = (function () {
 	      let connURI = this.getConnectURI();
 	      this.emit('connectURI', connURI);
 	      this.ws = new WebSocket(connURI);
-	      this.ws.onopen = this.onOpen.bind(this);
-	      this.ws.error = this.onError.bind(this);
+	      this.bindSocketEvents();
 	    } catch (e) {
 	      this.emit('error', e);
 	      this.scheduleReconnect();
 	    }
+	  }
+
+	  setHalfDead() {
+	    if (this._alive) {
+	      this._alive = false;
+	    } else {
+	      this.setDead();
+	    }
+	  }
+
+	  setHalfAlive() {
+	    this._alive = true;
+	    this.setAlive();
+	  }
+
+	  setAlive() {
+	    this._alive = true;
+	    this.alive = true;
+	  }
+
+	  setDead() {
+	    this.alive = false;
+	  }
+
+	  isAlive() {
+	    return this.alive;
+	  }
+
+	  isDead() {
+	    return !this.alive;
 	  }
 
 	  getConnectURI() {
@@ -7788,17 +7838,21 @@ var notWSClient = (function () {
 	  }
 
 	  onOpen() {
-	    this.emit('connected'); //Сбрасываем счётчик количества попыток подключения и данные об ошибках.
-
+	    //Сбрасываем счётчик количества попыток подключения и данные об ошибках.
 	    this.connCount = 0;
-	    this.isAlive = true;
+	    this.setAlive();
 	    clearInterval(this.connectInterval);
 	    this.connectInterval = false;
 	    this.errConnMsg = null;
-	    this.ws.onmessage = this.onMessage.bind(this);
-	    this.ws.onclose = this.onClose.bind(this);
+	    this.state = CONST.STATE.CONNECTED;
+
+	    if (this.isSecure()) {
+	      this.state = CONST.STATE.AUTHORIZED;
+	    }
+
 	    this.initPing();
 	    this.emit('ready');
+	    this.sendAllFromHistory();
 	  } //Обработчик сообщений пришедших от сервера.
 	  //msg - это messageEvent пришедший по WS, соответственно данные лежат в msg.data.
 
@@ -7826,8 +7880,6 @@ var notWSClient = (function () {
 	  }
 
 	  onError(err) {
-	    this.emit('disconnected');
-
 	    if (this.connectInterval) {
 	      clearInterval(this.connectInterval);
 	      this.connectInterval = false;
@@ -7844,8 +7896,6 @@ var notWSClient = (function () {
 
 
 	  onClose(event) {
-	    this.emit('disconnected');
-
 	    if (typeof event.code !== 'undefined') {
 	      let reason = `${event.code}::` + CONST.mapWsCloseCodes(event);
 	      this.emit('close', reason);
@@ -7881,28 +7931,32 @@ var notWSClient = (function () {
 	  }
 
 	  scheduleReconnect() {
-	    let timeout = this.getReconnectTimeout();
-	    this.emit('reconnectioningEvery', timeout);
+	    if (!this.slave) {
+	      let timeout = this.getReconnectTimeout();
+	      this.emit('reconnectioningEvery', timeout);
 
-	    if (this.connectInterval) {
-	      clearInterval(this.connectInterval);
-	    }
-
-	    this.connectInterval = setInterval(() => {
-	      if (this.isAlive === false) {
-	        if (this.ws.readyState === this.ws.CLOSED) {
-	          this.connect();
-	        }
+	      if (this.connectInterval) {
+	        clearInterval(this.connectInterval);
 	      }
-	    }, timeout);
+
+	      this.connectInterval = setInterval(() => {
+	        if (this.isAlive()) {
+	          if (!this.ws || this.ws.readyState === this.ws.CLOSED) {
+	            this.connect();
+	          }
+	        }
+	      }, timeout);
+	    }
 	  }
 
 	  reconnect() {
-	    if ([CONST.ACTIVITY.CONNECTING].indexOf(this.activity) > -1) {
-	      this.emit('concurentActivity', CONST.ACTIVITY[this.activity]);
-	      return;
-	    } else {
-	      this.scheduleReconnect();
+	    if (!this.slave) {
+	      if ([CONST.ACTIVITY.CONNECTING].indexOf(this.activity) > -1) {
+	        this.emit('concurentActivity', CONST.ACTIVITY[this.activity]);
+	        return;
+	      } else {
+	        this.scheduleReconnect();
+	      }
 	    }
 	  }
 	  /**
@@ -7915,10 +7969,14 @@ var notWSClient = (function () {
 	  }
 
 	  isAutoReconnect() {
-	    if (typeof this.options.reconnect !== 'undefined') {
-	      return this.options.reconnect;
+	    if (this.slave) {
+	      return false;
 	    } else {
-	      return CONST.CLIENT_AUTO_RECONNECT;
+	      if (typeof this.options.reconnect !== 'undefined') {
+	        return this.options.reconnect;
+	      } else {
+	        return CONST.CLIENT_AUTO_RECONNECT;
+	      }
 	    }
 	  }
 	  /**
@@ -7929,7 +7987,7 @@ var notWSClient = (function () {
 
 
 	  isConnected(secure = true) {
-	    if (this.ws && this.isAlive) {
+	    if (this.ws && this.isAlive()) {
 	      if (secure) {
 	        return this.isConnectionSecure();
 	      } else {
@@ -7950,18 +8008,28 @@ var notWSClient = (function () {
 	    return this.state === state && this.ws.readyState === 1; // 1- OPEN
 	  }
 
-	  isDead() {
-	    return this.isTerminated;
+	  isOpen() {
+	    return this.ws && this.ws.readyState === 1;
+	  }
+
+	  isMessageTokenUpdateRequest(data) {
+	    return data.type === '__service' && data.name === 'updateToken';
 	  }
 
 	  initPing() {
-	    if (this.options.ping) {
-	      if (this.intPing) {
-	        clearInterval(this.intPing);
-	        this.intPing = false;
-	      }
+	    //if server side client, only react on pong
+	    if (this.slave) {
+	      this.on('pong', Func.heartbeat);
+	    } else {
+	      //if client send ping requests
+	      if (this.options.ping) {
+	        if (this.pingInterval) {
+	          clearInterval(this.pingInterval);
+	          this.pingInterval = false;
+	        }
 
-	      this.intPing = setInterval(this.sendPing.bind(this), this.options.pingTimeout || CONST.PING_TIMEOUT);
+	        this.pingInterval = setInterval(this.sendPing.bind(this), this.options.pingTimeout || CONST.PING_TIMEOUT);
+	      }
 	    }
 	  }
 	  /**
@@ -7970,14 +8038,14 @@ var notWSClient = (function () {
 
 
 	  sendPing() {
-	    if (this.isAlive === false) {
+	    if (!this.isAlive()) {
 	      this.emit('noPong');
 	      this.disconnect();
 	      this.scheduleReconnect();
 	      return;
 	    }
 
-	    this.isAlive = false;
+	    this.setHalfDead();
 	    this.ping();
 	  }
 	  /**
@@ -7988,6 +8056,7 @@ var notWSClient = (function () {
 	  ping() {
 	    if (this.ws) {
 	      this.ws.send('ping');
+	      this.emit('ping');
 	    }
 	  }
 	  /**
@@ -7999,7 +8068,8 @@ var notWSClient = (function () {
 
 	  checkPingMsg(msg) {
 	    if (msg === 'pong') {
-	      this.isAlive = true;
+	      this.setHalfAlive();
+	      this.emit('pong');
 	      return true;
 	    }
 
@@ -8018,7 +8088,7 @@ var notWSClient = (function () {
 	    //Проверяем что клиент подключен
 	    return new Promise((resolve, reject) => {
 	      try {
-	        if (this.isConnected(secure)) {
+	        if (this.isConnected(secure) || this.isOpen() && this.isMessageTokenUpdateRequest(data)) {
 	          //Пытаемся отправить сообщение клиенту.
 	          this.ws.send(JSON.stringify(data), err => {
 	            if (err) {
@@ -8091,10 +8161,6 @@ var notWSClient = (function () {
 	            throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE$1]] + ' -> ' + CONST.STATE_NAME[state]);
 	          }
 
-	          if (state === CONST.STATE.AUTHORIZED) {
-	            this.emit('authorized');
-	          }
-
 	          break;
 	        //можем потерять авторизацию, но продолжить висеть на линии
 	        //повиснуть
@@ -8134,20 +8200,35 @@ var notWSClient = (function () {
 	          break;
 	      }
 
-	      if ([CONST.STATE.ERRORED, CONST.STATE.NO_PING].indexOf(state) > -1) {
-	        if (CONST.STATE.ERRORED === state) {
-	          this.emit('errored');
-	        } else {
+	      switch (this[SYMBOL_STATE$1]) {
+	        case CONST.STATE.NOT_CONNECTED:
+	          //если идём на обрыв, то переподключение не запускаем
+	          this.emit('disconnected');
+
+	          if (this.isAlive()) {
+	            this.emit('beforeReconnect');
+	            this.reconnect();
+	          }
+
+	          break;
+
+	        case CONST.STATE.CONNECTED:
+	          this.emit('connected');
+	          break;
+
+	        case CONST.STATE.AUTHORIZED:
+	          this.emit('authorized');
+	          break;
+
+	        case CONST.STATE.NO_PING:
 	          this.emit('noPing');
-	        }
+	          this.disconnectTimeout = setTimeout(this.disconnect.bind(this), 100);
+	          break;
 
-	        this.disconnectTimeout = setTimeout(this.disconnect.bind(this), 100);
-	      } //если идём на обрыв, то переподключение не запускаем
-
-
-	      if (CONST.STATE.NOT_CONNECTED === state && !this.isDead()) {
-	        this.emit('beforeReconnect');
-	        this.reconnect();
+	        case CONST.STATE.ERRORED:
+	          this.emit('errored');
+	          this.disconnectTimeout = setTimeout(this.disconnect.bind(this), 100);
+	          break;
 	      }
 
 	      return true;
@@ -8204,9 +8285,13 @@ var notWSClient = (function () {
 	    }
 	  }
 
-	} //env dep export
+	  destroy() {
+	    clearInterval(this.connectInterval);
+	    clearInterval(this.pingInterval);
+	    clearTimeout(this.disconnectTimeout);
+	  }
 
-	//imports
+	} //env dep export
 
 	/**
 	*
@@ -8227,10 +8312,9 @@ var notWSClient = (function () {
 	* @params {notWSMessenger}  messenger         - message handler
 	* @params {notWSRouter}     router            - request handler
 	* @params {object}          logger            - log interface {function:log, function:debug, function:error}
+	* @params {boolean}         slave             - true - this is server child connection for remote client, false - it is connection to another server
 	*
 	**/
-
-	const TIME_OFFSET_REQUEST_INTERVAL = 5 * 60 * 1000;
 
 	class notWSClient extends EventEmitter {
 	  constructor({
@@ -8239,7 +8323,12 @@ var notWSClient = (function () {
 	    getToken,
 	    messenger,
 	    router,
-	    logger
+	    logger,
+	    identity,
+	    //user information
+	    credentials,
+	    //client creds for access
+	    slave = false
 	  }) {
 	    if (!router || !(router instanceof notWSRouter)) {
 	      throw new Error('Router is not set or is not instance of notWSRouter');
@@ -8251,20 +8340,29 @@ var notWSClient = (function () {
 
 	    super(); //Основные параметры
 
-	    this.__name = name || 'WSClient'; //jwt
+	    this.__name = name ? name : CONST.DEFAULT_CLIENT_NAME; //jwt
 
 	    this.jwtToken = null; //Токен авторизации.
 
 	    this.jwtExpire = null; //Время до истечения токена.
 
 	    this.jwtDate = null; //Дата создания токена.
-	    //Подключение к WS
+	    //setting envs
 
-	    this.initConnection(connection);
 	    this.tokenGetter = getToken;
+	    this.identity = identity;
+	    this.credentials = credentials;
 	    this.messenger = messenger;
 	    this.router = router;
-	    this.router.on('updateToken', this.renewToken.bind(this)); //logging
+	    this.slave = slave; //Подключение к WS
+
+	    this.initConnection(connection, this.slave);
+
+	    if (!this.slave) {
+	      this.router.on('updateToken', this.renewToken.bind(this));
+	    } //common constructor part for client browser client, node client, node server client
+	    //logging
+
 
 	    this.logMsg = logger ? logger.log : () => {};
 	    this.logDebug = logger ? logger.debug : () => {};
@@ -8280,16 +8378,19 @@ var notWSClient = (function () {
 	    //time off set from server time
 
 	    this._timeOffset = 0;
-	    this.getTimeOffsetInt = null; //message history if in online
+	    this.getTimeOffsetInt = null;
 
-	    this.history = [];
-	    this.connect();
+	    if (!this.slave) {
+	      this.connect();
+	    }
+
+	    return this;
 	  }
 
 	  initConnection(connection) {
 	    this.connection = new notWSConnection(connection);
 	    this.connection.on('disconnected', () => {
-	      this.logMsg('dicconnected');
+	      this.logMsg('disconnected');
 	      this.stopReqChckTimer();
 	      this.emit('close', this);
 	    });
@@ -8309,246 +8410,73 @@ var notWSClient = (function () {
 	      this.logError(e);
 	    });
 	    this.connection.on('message', this.processMessage.bind(this));
+	    this.connection.on('ready', () => {
+	      this.logMsg('ready');
+	      this.emit('ready', this);
+	    });
+	    this.connection.on('ping', () => {
+	      this.logMsg('ping');
+	    });
+	    this.connection.on('pong', () => {
+	      this.logMsg('pong');
+	    });
 	  }
 
 	  async connect() {
-	    try {
-	      //если нужна аутентификация
-	      if (this.connection.isSecure()) {
-	        //получаем и сохраняем токен токен
-	        this.saveToken((await this.getToken()));
-	      } //подключаемся
-
-
-	      this.connection.connect();
-	    } catch (e) {
-	      this.logError(e);
-	    }
-	  } //Получение токена.
-	  //Возможно реализовать разными способами, поэтому выделено в отдельный метод.
-
-
-	  getToken(renew = false) {
-	    let token = localStorage.getItem('token');
-
-	    if (typeof token !== 'undefined' && token !== 'undefined' && token && !renew) {
-	      return Promise.resolve(token);
-	    } else {
-	      if (Func.isFunc(this.tokenGetter)) {
-	        return this.tokenGetter();
-	      } else {
-	        return Promise.reject();
-	      }
-	    }
-	  }
-
-	  async renewToken() {
-	    try {
-	      let token = await this.getToken(true);
-
-	      if (token) {
-	        this.saveToken(token);
-	      } else {
-	        throw new Error('Token isn\'t renewed');
-	      }
-	    } catch (e) {
-	      this.logError(e);
-	    }
-	  }
-
-	  saveToken(token) {
-	    localStorage.setItem('token', token);
-	    this.jwtToken = token;
-	    this.messenger.setCredentials(token);
-	    this.connection.setToken(token);
-	    this.emit('tokenUpdated', token);
-	  } //Обработчик сообщений пришедших от сервера.
-	  //data - JSON
-
-
-	  processMessage(data) {
-	    try {
-	      this.messenger.validate(data);
-	      let msg = this.messenger.unpack(data); //general event
-
-	      this.emit('message', msg, this); //specific event
-
-	      this.emit(msg.service.type + ':' + msg.service.name, msg.service, msg.payload, this.connection.getSocket()); //routing
-
-	      this.selectRoute(msg);
-	    } catch (e) {
-	      this.logError(e, e.details);
-	    }
-	  }
-
-	  selectRoute(msg) {
-	    switch (msg.service.type) {
-	      //couple of special types
-	      case CONST.MSG_TYPE.RESPONSE:
-	        this.routeResponse(msg);
-	        break;
-
-	      case CONST.MSG_TYPE.EVENT:
-	        this.routeEvent(msg);
-	        break;
-	      //all other
-
-	      default:
-	        this.routeCommon(msg);
-	    }
-	  }
-
-	  routeResponse(msg) {
-	    let request = this.fullfillRequest(msg.service.id);
-
-	    if (request !== null) {
-	      request.cb(msg);
-	    }
-	  }
-
-	  routeEvent(msg) {
-	    this.router.route(msg.service, msg.payload, this.connection.getSocket()).catch(e => {
-	      this.logError(e);
-	    });
-	  }
-
-	  routeCommon(msg) {
-	    this.router.route(msg.service, msg.payload, this.connection.getSocket()).then(responseData => {
-	      this.respond(responseData, {
-	        id: msg.service.id,
-	        type: CONST.MSG_TYPE.RESPONSE,
-	        name: msg.service.name
-	      });
-	    }).catch(e => {
-	      this.logError(e);
-	      this.respond({}, {
-	        id: msg.service.id,
-	        type: CONST.MSG_TYPE.RESPONSE,
-	        name: msg.service.name
-	      }, e);
-	    });
-	  }
-
-	  respond(resp, service = {}, error) {
-	    if (resp && typeof resp === 'object' && resp !== null) {
-	      let msg = this.messenger.pack(resp, service, error);
-	      return this.connection.send(msg);
-	    } else {
-	      return true;
-	    }
-	  }
-	  /**
-	  *  Отправка данных определенного типа и названия
-	  *  @param {string}  type  тип данных
-	  *  @param {string}  name  название
-	  *  @param {object}  payload  данные
-	  *  @returns  {Promise}
-	  */
-
-
-	  send(type, name, payload) {
-	    if (type === CONST.MSG_TYPE.REQUEST) {
-	      return this.request(name, payload);
-	    } else {
-	      return this.message(type, name, payload);
-	    }
-	  }
-
-	  message(type, name, payload) {
-	    if (payload !== 'pong' && payload !== 'ping') {
-	      this.logMsg('outgoing message', type, name);
-	    }
-
-	    let message = this.messenger.pack(payload, {
-	      type,
-	      timeOffset: this.timeOffset,
-	      name
-	    });
-	    return this.connection.send(message).catch(this.logError.bind(this));
-	  } //Отправка запроса на сервер.
-
-
-	  request(name, payload) {
-	    this.logMsg('outgoing request', name);
-	    return new Promise((res, rej) => {
+	    if (!this.slave) {
 	      try {
-	        //Формирование данных запроса.
-	        let req = this.messenger.pack(payload, {
-	          type: 'request',
-	          timeOffset: this.timeOffset,
-	          name
-	        }); //Добавление запроса в список отправленных запросов.
+	        if (!this.isConnected()) {
+	          //если нужна аутентификация
+	          if (this.connection.isSecure()) {
+	            //получаем и сохраняем токен токен
+	            this.saveToken((await this.getToken()));
+	          } //подключаемся
 
-	        this.addRequest(this.messenger.getServiceData(req).id, res); //Отправка запроса на сервер.
 
-	        this.connection.send(req);
+	          this.connection.connect();
+	        }
 	      } catch (e) {
 	        this.logError(e);
-	        rej(e);
 	      }
-	    });
+	    }
+	  }
+
+	  suicide() {
+	    this.emit('errored', this);
+	  }
+
+	  disconnect() {
+	    this.connection.disconnect();
+	  }
+
+	  terminate() {
+	    this.connection.terminate();
+	    this.connection.destroy();
+	  }
+
+	  isDead() {
+	    return !this.connection.isAlive();
+	  }
+
+	  isAlive() {
+	    return this.connection.isAlive();
+	  }
+
+	  reconnect() {
+	    this.connection.reconnect();
+	  }
+
+	  isConnected(secure = true) {
+	    return this.connection.isConnected(secure);
 	  }
 
 	  isSecure() {
 	    return this.connection.isSecure();
 	  }
 
-	  isConnected() {
-	    return this.connection.isConnected();
-	  }
-
-	  isDead() {
-	    return this.connection.isDead();
-	  }
-
 	  isAutoReconnect() {
 	    return this.connection.isAutoReconnect();
-	  }
-	  /**
-	  * Server time
-	  */
-
-
-	  requestServerTime() {
-	    if (this.connection.isConnected()) {
-	      let req = {
-	        cmd: 'getTime',
-	        data: {}
-	      };
-	      const sendTime = Date.now();
-	      this.request(req, (err, result) => {
-	        if (err) {
-	          this.logError(err);
-	        } else {
-	          const receiveTime = Date.now();
-	          const correction = Math.round((receiveTime - sendTime) / 2);
-	          const serverTime = parseInt(result, 10);
-	          const correctedTime = serverTime + correction;
-	          const offset = correctedTime - receiveTime;
-	          this.timeOffset = offset;
-	        }
-	      });
-	    }
-	  }
-
-	  set timeOffset(val) {
-	    this._timeOffset = val;
-	  }
-
-	  get timeOffset() {
-	    return this._timeOffset;
-	  }
-
-	  getTimeOnAuthorized() {
-	    if (this.getTimeOffsetInt) {
-	      clearInterval(this.getTimeOffsetInt);
-	      this.getTimeOffsetInt = null;
-	    }
-
-	    this.requestServerTime();
-	    this.getTimeOffsetInt = setInterval(this.requestServerTime.bind(this), TIME_OFFSET_REQUEST_INTERVAL);
-	  } //набор методов для работы с запросами и выявления безответных
-	  //Запуск таймера проверки запросов.
+	  } //Запуск таймера проверки запросов.
 
 
 	  startReqChckTimer() {
@@ -8632,6 +8560,241 @@ var notWSClient = (function () {
 
 	      this.requests.splice(reqIndex, 1);
 	    });
+	  } //Получение токена.
+	  //Возможно реализовать разными способами, поэтому выделено в отдельный метод.
+
+
+	  getToken(renew = false) {
+	    let token = localStorage.getItem('token');
+
+	    if (typeof token !== 'undefined' && token !== 'undefined' && token && !renew) {
+	      return Promise.resolve(token);
+	    } else {
+	      if (Func.isFunc(this.tokenGetter)) {
+	        return this.tokenGetter();
+	      } else {
+	        return Promise.reject();
+	      }
+	    }
+	  }
+
+	  async renewToken() {
+	    if (!this.slave) {
+	      try {
+	        let token = await this.getToken(true);
+
+	        if (token) {
+	          this.saveToken(token);
+	        } else {
+	          throw new Error('Token isn\'t renewed');
+	        }
+	      } catch (e) {
+	        this.logError(e);
+	      }
+	    }
+	  }
+
+	  saveToken(token) {
+	    if (!this.slave) {
+	      localStorage.setItem('token', token);
+	      this.jwtToken = token;
+	      this.messenger.setCredentials(token);
+	      this.connection.setToken(token);
+	      this.emit('tokenUpdated', token);
+	    }
+	  }
+
+	  ping() {
+	    this.connection.sendPing();
+	  }
+
+	  processMessage(data) {
+	    try {
+	      this.messenger.validate(data);
+	      let msg = this.messenger.unpack(data);
+	      this.emit('message', msg, this);
+	      this.emit(msg.service.type + ':' + msg.service.name, msg.service, msg.payload, this.connection.getSocket()); //routing
+
+	      this.selectRoute(msg);
+	    } catch (e) {
+	      this.logError(e, e.details);
+	    }
+	  }
+
+	  selectRoute(msg) {
+	    switch (msg.service.type) {
+	      //couple of special types
+	      case CONST.MSG_TYPE.RESPONSE:
+	        this.routeResponse(msg);
+	        break;
+
+	      case CONST.MSG_TYPE.REQUEST:
+	        this.routeRequest(msg);
+	        break;
+
+	      case CONST.MSG_TYPE.EVENT:
+	        this.routeEvent(msg);
+	        break;
+	      //all other
+
+	      default:
+	        this.routeCommon(msg);
+	    }
+	  }
+
+	  routeResponse(msg) {
+	    let request = this.fullfillRequest(msg.service.id);
+
+	    if (request !== null) {
+	      request.cb(msg);
+	    }
+	  }
+
+	  routeEvent(msg) {
+	    this.router.route(msg.service, msg.payload, this.connection.getSocket()).catch(e => {
+	      this.logError(e);
+	    });
+	  }
+
+	  routeCommon(msg) {
+	    this.router.route(msg.service, msg.payload, this.connection.getSocket()).catch(e => {
+	      this.logError(e);
+	      this.respond({}, {
+	        id: msg.service.id,
+	        type: CONST.MSG_TYPE.RESPONSE,
+	        name: msg.service.name
+	      }, e);
+	    });
+	  }
+
+	  routeRequest(msg) {
+	    this.router.route(msg.service, msg.payload, this.connection.getSocket()).then(responseData => {
+	      this.respond(responseData, {
+	        id: msg.service.id,
+	        type: CONST.MSG_TYPE.RESPONSE,
+	        name: msg.service.name
+	      });
+	    }).catch(e => {
+	      this.logError(e);
+	      this.respond({}, {
+	        id: msg.service.id,
+	        type: CONST.MSG_TYPE.RESPONSE,
+	        name: msg.service.name
+	      }, e);
+	    });
+	  }
+	  /**
+	  *  Отправка данных определенного типа и названия
+	  *  @param {string}  type  тип данных
+	  *  @param {string}  name  название
+	  *  @param {object}  payload  данные
+	  *  @returns  {Promise}
+	  */
+
+
+	  send(type, name, payload) {
+	    if (type === CONST.MSG_TYPE.REQUEST) {
+	      return this.request(name, payload);
+	    } else {
+	      return this.message(type, name, payload);
+	    }
+	  }
+
+	  respond(resp, service = {}, error) {
+	    if (typeof resp === 'object' && resp !== null) {
+	      let msg = this.messenger.pack(resp, service, error);
+	      return this.connection.send(msg);
+	    } else {
+	      return true;
+	    }
+	  }
+
+	  __request(name, payload, cb, secure = true) {
+	    let message = this.messenger.pack(payload, {
+	      type: CONST.MSG_TYPE.REQUEST,
+	      timeOffset: this.timeOffset,
+	      name
+	    });
+	    this.addRequest(this.messenger.getServiceData(message).id, cb);
+	    this.connection.send(message, secure).catch(this.logError.bind(this));
+	  }
+
+	  request(name, payload, secure = true) {
+	    return new Promise((resolve, reject) => {
+	      try {
+	        this.__request(name, payload, response => {
+	          if (response === CONST.ERR_MSG.REQUEST_TIMEOUT_MESSAGE) {
+	            return reject(response);
+	          }
+
+	          if (this.messenger.validate(response)) {
+	            if (this.messenger.isErrored(response)) {
+	              return reject(response);
+	            }
+	          }
+
+	          resolve(response);
+	        }, secure);
+	      } catch (e) {
+	        reject(e);
+	      }
+	    });
+	  }
+
+	  message(type, name, payload) {
+	    if (payload !== 'pong' && payload !== 'ping') {
+	      this.logMsg('outgoing message', type, name);
+	    }
+
+	    let message = this.messenger.pack(payload, {
+	      type,
+	      timeOffset: this.timeOffset,
+	      name
+	    });
+	    return this.connection.send(message).catch(this.logError.bind(this));
+	  }
+
+	  informClientAboutExperiedToken() {
+	    this.logMsg('force to update token');
+	    this.send('__service', 'updateToken', {}, false).catch(this.logError.bind(this));
+	  }
+	  /**
+	  * Server time
+	  */
+
+
+	  requestServerTime() {
+	    if (this.connection.isConnected()) {
+	      const sendTime = Date.now();
+	      this.request('getTime', {}).then(result => {
+	        const receiveTime = Date.now();
+	        const correction = Math.round((receiveTime - sendTime) / 2);
+	        const serverTime = parseInt(result, 10);
+	        const correctedTime = serverTime + correction;
+	        const offset = correctedTime - receiveTime;
+	        this.timeOffset = offset;
+	      }).catch(err => {
+	        this.logError(err);
+	      });
+	    }
+	  }
+
+	  set timeOffset(val) {
+	    this._timeOffset = val;
+	  }
+
+	  get timeOffset() {
+	    return this._timeOffset;
+	  }
+
+	  getTimeOnAuthorized() {
+	    if (this.getTimeOffsetInt) {
+	      clearInterval(this.getTimeOffsetInt);
+	      this.getTimeOffsetInt = null;
+	    }
+
+	    this.requestServerTime();
+	    this.getTimeOffsetInt = setInterval(this.requestServerTime.bind(this), CONST.TIME_OFFSET_REQUEST_INTERVAL);
 	  }
 
 	} //env dep export

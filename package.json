@@ -9,7 +9,7 @@
     "prelint": "npm run buildtest",
     "pretest": "npm run lint",
     "test": "./node_modules/.bin/mocha --reporter spec",
-    "retest": "./node_modules/.bin/mocha --require async-dump --reporter spec",
+    "retest": "./node_modules/.bin/mocha --require test/async-dump --reporter spec",
     "lint": "./node_modules/.bin/eslint ./src/**/** --fix",
     "docs": "./node_modules/.bin/jsdoc -c jsdoc.json",
     "cover": "nyc npm test"

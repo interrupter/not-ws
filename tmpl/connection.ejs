@@ -23,42 +23,51 @@ const DEFAULT_OPTIONS = {
 };
 
 class notWSConnection extends EventEmitter{
-  constructor(options){
+  constructor(options, slave = false){
     super();
     this.options = Object.assign({}, DEFAULT_OPTIONS, options);
     if(this.options.ws){
       this.ws = options.ws;
-      this.isAlive = true; //результат пинг запросов
       delete options.ws;
+      if(this.ws.readyState === 1){
+        this.setAlive(); //результат пинг запросов
+        this[SYMBOL_STATE] = CONST.STATE.CONNECTED;
+      }else{
+        this[SYMBOL_STATE] = CONST.STATE.NOT_CONNECTED;
+        this.setDead(); //результат пинг запросов
+      }
     }else{
-      this.isAlive = false; //результат пинг запросов
+      this[SYMBOL_STATE] = CONST.STATE.NOT_CONNECTED;
+      this.setDead(); //результат пинг запросов
       this.ws = null; //Подключение к websocket серверу.
     }
+    this[SYMBOL_ACTIVITY] = CONST.ACTIVITY.IDLE;
     //if was terminated
     this.isTerminated = false;
     this.isReconnecting = false;
     this.closing = false;
+    this.slave = slave;
     this.heartbeatTimeout = null;
-		this.connectInterval = null;
+    this.connectInterval = null;
     this.connCount = 0; //Количество неудачных попыток подключения к websocket серверу.
     this.connCountMax = 10; //Количество попыток по превышении которого считаем что соединение с серверов разорвано.
     this.errConnMsg = null; //Идентификатор сообщения об ошибке подключения к вебсокет серверу.
     this.firstConn = true;
-
-
-    //connection state and current activity
-		if(this.options.state === 'online'){
-			this[SYMBOL_STATE] = CONST.STATE.CONNECTED;
-		}else{
-			this[SYMBOL_STATE] = CONST.STATE.NOT_CONNECTED;
-		}
-		this[SYMBOL_ACTIVITY] = CONST.ACTIVITY.IDLE;
-
     this.bindEnvEvents();
     this.bindSocketEvents();
     //message history
-		this.history = [];
+    this.history = [];
     return this;
+  }
+
+  getStatus(){
+    return {
+      state:          CONST.STATE_NAME[this[SYMBOL_STATE]],
+      activity:       CONST.ACTIVITY_NAME[this[SYMBOL_ACTIVITY]],
+      isAlive:        this.isAlive(),
+      isTerminated:   this.isTerminated,
+      isReconnecting: this.isReconnecting,
+    };
   }
 
   getSocket(){
@@ -66,22 +75,25 @@ class notWSConnection extends EventEmitter{
   }
 
   bindSocketEvents(){
+    if(this.ws){
     <% if (env === 'node'){ %>
-    //events binding to client socket
-		this.listeners = {
-			open: this.onOpen.bind(this),
-			message: this.onMessage.bind(this),
-			close: this.onClose.bind(this),
-			error: this.onError.bind(this)
-		};
-    this.ws.on('open', this.listeners.open);
-		this.ws.on('message', this.listeners.message);
-		this.ws.on('close', this.listeners.close);
-		this.ws.on('error', this.listeners.error);
-		this.ws.on('pong', this.onPong.bind(this));
+        //events binding to client socket
+        this.listeners = {
+          open: this.onOpen.bind(this),
+          message: this.onMessage.bind(this),
+          close: this.onClose.bind(this),
+          error: this.onError.bind(this)
+        };
+        this.ws.on('open', this.listeners.open);
+        this.ws.on('message', this.listeners.message);
+        this.ws.on('close', this.listeners.close);
+        this.ws.on('error', this.listeners.error);
+        this.ws.on('pong', this.onPong.bind(this));
     <% }else{ %>
-
+      this.ws.onopen = this.onOpen.bind(this);
+      this.ws.error = this.onError.bind(this);
     <% } %>
+    }
   }
 
 
@@ -108,7 +120,6 @@ class notWSConnection extends EventEmitter{
       //закрываем подключение.
       this.ws.close && this.ws.close();
       this.terminate();
-      this.emit('disconnected');
     }
   }
 
@@ -116,22 +127,23 @@ class notWSConnection extends EventEmitter{
     if(this.connectInterval){
       clearInterval(this.connectInterval);
     }
-		if (this.ws) {
+    if (this.ws) {
       this.activity = CONST.ACTIVITY.TERMINATING;
       <% if (env === 'node'){ %>
       this.ws.removeAllListeners();
-			for (let name in this.listeners) {
-				this.ws.removeListener(name, this.listeners[name]);
-			}
+      for (let name in this.listeners) {
+        this.ws.removeListener(name, this.listeners[name]);
+      }
       <% }%>
       this.ws.terminate && this.ws.terminate();
-		}
-		this.isTerminated = true;
-		this.ws = null;
-		if(this.state!==CONST.STATE.NOT_CONNECTED){
-			this.state = CONST.STATE.NOT_CONNECTED;
-		}
-	}
+    }
+    this.isTerminated = true;
+    this.ws = null;
+    if(this.state !== CONST.STATE.NOT_CONNECTED){
+      this.state = CONST.STATE.NOT_CONNECTED;
+    }
+    this.setDead();
+  }
 
   //Подключение к websocket сервису.
   async connect(){
@@ -139,7 +151,8 @@ class notWSConnection extends EventEmitter{
       if(this.ws && (this.ws.readyState !== WebSocket.CLOSED)){
         this.disconnect();
       }
-      this.isAlive = true;
+      this.setAlive();
+      this.isTerminated = false;
       this.emit('connecting');
       //Счётчик колиества попыток подключения:
       this.connCount++;
@@ -147,17 +160,41 @@ class notWSConnection extends EventEmitter{
       let connURI = this.getConnectURI();
       this.emit('connectURI', connURI);
       this.ws = new WebSocket(connURI);
-      <% if (env == 'node'){ %>
-      this.ws.on('open', this.onOpen.bind(this));
-      this.ws.on('error', this.onError.bind(this));
-      <% }else{ %>
-      this.ws.onopen = this.onOpen.bind(this);
-      this.ws.error = this.onError.bind(this);
-      <% } %>
+      this.bindSocketEvents();
     }catch(e){
       this.emit('error',e);
       this.scheduleReconnect();
     }
+  }
+
+  setHalfDead(){
+    if(this._alive){
+      this._alive = false;
+    }else{
+      this.setDead();
+    }
+  }
+
+  setHalfAlive(){
+    this._alive = true;
+    this.setAlive();
+  }
+
+  setAlive(){
+    this._alive = true;
+    this.alive = true;
+  }
+
+  setDead(){
+    this.alive = false;
+  }
+
+  isAlive(){
+    return this.alive;
+  }
+
+  isDead(){
+    return !this.alive;
   }
 
   getConnectURI(){
@@ -187,22 +224,19 @@ class notWSConnection extends EventEmitter{
   }
 
   onOpen(){
-    this.emit('connected');
     //Сбрасываем счётчик количества попыток подключения и данные об ошибках.
     this.connCount = 0;
-    this.isAlive = true;
+    this.setAlive();
     clearInterval(this.connectInterval);
     this.connectInterval = false;
     this.errConnMsg = null;
-    <% if (env == 'node') { %>
-      this.ws.on('message', this.onMessage.bind(this));
-      this.ws.on('close', this.onClose.bind(this));
-    <% }else{ %>
-      this.ws.onmessage = this.onMessage.bind(this);
-      this.ws.onclose = this.onClose.bind(this);
-    <% } %>
+    this.state = CONST.STATE.CONNECTED;
+    if(this.isSecure()){
+      this.state = CONST.STATE.AUTHORIZED;
+    }
     this.initPing();
     this.emit('ready');
+    this.sendAllFromHistory();
   }
 
   //Обработчик сообщений пришедших от сервера.
@@ -231,22 +265,20 @@ class notWSConnection extends EventEmitter{
   }
 
   onError(err){
-    this.emit('disconnected');
     if(this.connectInterval){
       clearInterval(this.connectInterval);
       this.connectInterval = false;
     }
     if (this.activity === CONST.ACTIVITY.TERMINATING) {
-			this.state = CONST.STATE.NOT_CONNECTED;
-		} else {
-			this.state = CONST.STATE.ERRORED;
-		}
+      this.state = CONST.STATE.NOT_CONNECTED;
+    } else {
+      this.state = CONST.STATE.ERRORED;
+    }
     this.emit('error', err);
   }
 
   //Обработчик закрытия подключения.
   onClose(event){
-    this.emit('disconnected');
     if (typeof event.code !== 'undefined') {
       let reason = `${event.code}::` + CONST.mapWsCloseCodes(event);
       this.emit('close', reason);
@@ -259,10 +291,10 @@ class notWSConnection extends EventEmitter{
     }
 
     if (this.activity === CONST.ACTIVITY.CLOSING) {
-			this.state = CONST.STATE.NOT_CONNECTED;
-		} else {
-			this.state = CONST.STATE.ERRORED;
-		}
+      this.state = CONST.STATE.NOT_CONNECTED;
+    } else {
+      this.state = CONST.STATE.ERRORED;
+    }
 
     if(this.isAutoReconnect()){
       this.scheduleReconnect();
@@ -270,8 +302,8 @@ class notWSConnection extends EventEmitter{
   }
 
   suicide() {
-		this.emit('errored', this);
-	}
+    this.emit('errored', this);
+  }
 
   getReconnectTimeout(){
     if(this.connCount >= this.connCountMax){
@@ -282,31 +314,35 @@ class notWSConnection extends EventEmitter{
   }
 
   scheduleReconnect(){
-    let timeout = this.getReconnectTimeout();
-    this.emit('reconnectioningEvery', timeout);
-    if (this.connectInterval){
-      clearInterval(this.connectInterval);
-    }
-    this.connectInterval = setInterval(
-      ()=>{
-        if(this.isAlive === false){
-          if(this.ws.readyState === this.ws.CLOSED){
-            this.connect();
+    if(!this.slave){
+      let timeout = this.getReconnectTimeout();
+      this.emit('reconnectioningEvery', timeout);
+      if (this.connectInterval){
+        clearInterval(this.connectInterval);
+      }
+      this.connectInterval = setInterval(
+        ()=>{
+          if(this.isAlive()){
+            if((!this.ws) || (this.ws.readyState === this.ws.CLOSED)){
+              this.connect();
+            }
           }
-        }
-      },
-      timeout
-    );
+        },
+        timeout
+      );
+    }
   }
 
   reconnect() {
-		if ([CONST.ACTIVITY.CONNECTING].indexOf(this.activity) > -1) {
-			this.emit('concurentActivity', CONST.ACTIVITY[this.activity]);
-			return;
-		} else {
-			this.scheduleReconnect();
-		}
-	}
+    if(!this.slave){
+      if ([CONST.ACTIVITY.CONNECTING].indexOf(this.activity) > -1) {
+        this.emit('concurentActivity', CONST.ACTIVITY[this.activity]);
+        return;
+      } else {
+        this.scheduleReconnect();
+      }
+    }
+  }
 
   /**
   *  Требуется аутентификация или нет
@@ -316,10 +352,14 @@ class notWSConnection extends EventEmitter{
   }
 
   isAutoReconnect(){
-    if (typeof this.options.reconnect !== 'undefined'){
-      return this.options.reconnect
+    if(this.slave){
+      return false;
     }else{
-      return CONST.CLIENT_AUTO_RECONNECT;
+      if (typeof this.options.reconnect !== 'undefined'){
+        return this.options.reconnect
+      }else{
+        return CONST.CLIENT_AUTO_RECONNECT;
+      }
     }
   }
 
@@ -329,7 +369,7 @@ class notWSConnection extends EventEmitter{
    *  @params {boolean} secure      if user should be connected and authenticated
    */
   isConnected(secure = true){
-    if(this.ws && this.isAlive){
+    if(this.ws && this.isAlive()){
       if(secure){
         return this.isConnectionSecure();
       }else{
@@ -342,24 +382,33 @@ class notWSConnection extends EventEmitter{
 
   isConnectionSecure(){
     let state = CONST.STATE.CONNECTED;
-		if (this.isSecure()) {
-			state = CONST.STATE.AUTHORIZED;
-		}
-		return (this.state === state) && (this.ws.readyState === 1); // 1- OPEN
+    if (this.isSecure()) {
+      state = CONST.STATE.AUTHORIZED;
+    }
+    return (this.state === state) && (this.ws.readyState === 1); // 1- OPEN
   }
 
-  isDead() {
-		return this.isTerminated;
-	}
+  isOpen(){
+    return this.ws && this.ws.readyState === 1;
+  }
 
+  isMessageTokenUpdateRequest(data){
+    return data.type === '__service' && data.name === 'updateToken';
+  }
 
   initPing(){
-    if(this.options.ping){
-      if(this.intPing){
-        clearInterval(this.intPing);
-        this.intPing = false;
+    //if server side client, only react on pong
+    if(this.slave){
+      this.on('pong', Func.heartbeat);
+    }else{
+      //if client send ping requests
+      if(this.options.ping){
+        if(this.pingInterval){
+          clearInterval(this.pingInterval);
+          this.pingInterval = false;
+        }
+        this.pingInterval = setInterval(this.sendPing.bind(this), this.options.pingTimeout || CONST.PING_TIMEOUT);
       }
-      this.intPing = setInterval(this.sendPing.bind(this), this.options.pingTimeout || CONST.PING_TIMEOUT);
     }
   }
 
@@ -367,13 +416,13 @@ class notWSConnection extends EventEmitter{
   * If not connected, reconnects, else sets connection isNotAlive and sends ping
   */
   sendPing(){
-    if(this.isAlive === false){
+    if(!this.isAlive()){
       this.emit('noPong');
       this.disconnect();
       this.scheduleReconnect();
       return;
     }
-    this.isAlive = false;
+    this.setHalfDead();
     this.ping();
   }
 
@@ -381,14 +430,15 @@ class notWSConnection extends EventEmitter{
   * Ping connection
   */
   ping(){
-		if(this.ws){
-			<% if (env === 'node') {%>
-			this.ws.ping(Func.noop);
+    if(this.ws){
+      <% if (env === 'node') {%>
+      this.ws.ping(Func.noop);
       <% }else{ %>
       this.ws.send('ping');
       <% } %>
-		}
-	}
+      this.emit('ping');
+    }
+  }
 
   /**
   * If message is plain text 'pong', then it sets connections as isAlive
@@ -397,7 +447,8 @@ class notWSConnection extends EventEmitter{
   **/
   checkPingMsg(msg){
     if (msg === 'pong'){
-      this.isAlive = true;
+      this.setHalfAlive();
+      this.emit('pong');
       return true;
     }
     return false;
@@ -405,11 +456,12 @@ class notWSConnection extends EventEmitter{
 
   <% if (env==='node'){ %>
   /**
-	*	Proxy for WebSocket event
-	*/
-	onPong(){
-		this.emit('pong');
-	}
+  *  Proxy for WebSocket event
+  */
+  onPong(){
+    this.setHalfAlive();
+    this.emit('pong');
+  }
   <% } %>
 
   /**
@@ -423,7 +475,7 @@ class notWSConnection extends EventEmitter{
     //Проверяем что клиент подключен
     return new Promise((resolve, reject) => {
       try {
-        if (this.isConnected(secure)) {
+        if (this.isConnected(secure) || (this.isOpen() && this.isMessageTokenUpdateRequest(data))) {
           //Пытаемся отправить сообщение клиенту.
           this.ws.send(JSON.stringify(data), (err) => {
             if (err) {
@@ -446,127 +498,131 @@ class notWSConnection extends EventEmitter{
   }
 
   addToHistory(data) {
-		this.emit('addToHistory', data);
-		this.history.push(data);
-		if (this.history.length > MAX_HISTORY_DEPTH) {
-			this.history.shift();
-		}
-	}
+    this.emit('addToHistory', data);
+    this.history.push(data);
+    if (this.history.length > MAX_HISTORY_DEPTH) {
+      this.history.shift();
+    }
+  }
 
-	sendAllFromHistory() {
-		while (this.history.length) {
-			let msg = this.history.shift();
+  sendAllFromHistory() {
+    while (this.history.length) {
+      let msg = this.history.shift();
       //sending out but only in secure manner, all messages for not auth users will be dropped
-			this.send(msg, true).catch(this.onError.bind(this));
-		}
-	}
+      this.send(msg, true).catch(this.onError.bind(this));
+    }
+  }
 
   /**
   * Finite states machine
   */
 
   get state() {
-		return this[SYMBOL_STATE];
-	}
+    return this[SYMBOL_STATE];
+  }
 
-	set state(state = CONST.STATE.NOT_CONNECTED) {
-		if (Object.values(CONST.STATE).indexOf(state) > -1) {
-			this.emit('stateChange', state, CONST.STATE_NAME[state]);
-			//для каждого варианта, есть только ограниченное кол-во вариантов перехода
-			//из "нет соединения" в "авторизован" не прыгнуть
-			switch (this[SYMBOL_STATE]) {
-			//можем только подключиться или вылететь с ошибкой подключения
-			case CONST.STATE.NOT_CONNECTED:
-				if ([CONST.STATE.CONNECTED, CONST.STATE.ERRORED].indexOf(state) > -1) {
-					this[SYMBOL_STATE] = state;
-					this.activity = CONST.ACTIVITY.IDLE;
-				} else {
-					throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
-				}
-				break;
-				//можем повиснуть, авторизоваться вылететь с ошибкой
-			case CONST.STATE.CONNECTED:
-				if (
-					[
-						CONST.STATE.AUTHORIZED,
-						CONST.STATE.NO_PING,
-						CONST.STATE.ERRORED,
-						CONST.STATE.NOT_CONNECTED
-					].indexOf(state) > -1) {
-					this[SYMBOL_STATE] = state;
-					this.activity = CONST.ACTIVITY.IDLE;
-				} else {
-					throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
-				}
-				if (state === CONST.STATE.AUTHORIZED) {
-					this.emit('authorized');
-				}
-				break;
-				//можем потерять авторизацию, но продолжить висеть на линии
-				//повиснуть
-				//вылететь с ошибкой связи
-			case CONST.STATE.AUTHORIZED:
-				if (
-					[
-						CONST.STATE.CONNECTED,
-						CONST.STATE.NO_PING,
-						CONST.STATE.ERRORED,
-						CONST.STATE.NOT_CONNECTED
-					].indexOf(state) > -1) {
-					this[SYMBOL_STATE] = state;
-					this.activity = CONST.ACTIVITY.IDLE;
-				} else {
-					throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
-				}
-				break;
-				////из остояний разрыва связи, можно уйти только в "не подключен"
-				//можем только отключиться
-			case CONST.STATE.NO_PING:
-				if ([CONST.STATE.NOT_CONNECTED].indexOf(state) > -1) {
-					this[SYMBOL_STATE] = state;
-					this.activity = CONST.ACTIVITY.IDLE;
-				} else {
-					throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
-				}
-				break;
-				//можем только отключиться
-			case CONST.STATE.ERRORED:
-				if ([
-					CONST.STATE.NOT_CONNECTED,
-					CONST.STATE.ERRORED
-				].indexOf(state) > -1) {
-					this[SYMBOL_STATE] = state;
-					this.activity = CONST.ACTIVITY.IDLE;
-				} else {
-					throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
-				}
-				break;
-			}
-			if ([CONST.STATE.ERRORED, CONST.STATE.NO_PING].indexOf(state) > -1) {
-        if(CONST.STATE.ERRORED === state){
-          this.emit('errored');
-        }else{
-          this.emit('noPing');
+  set state(state = CONST.STATE.NOT_CONNECTED) {
+    if (Object.values(CONST.STATE).indexOf(state) > -1) {
+      this.emit('stateChange', state, CONST.STATE_NAME[state]);
+      //для каждого варианта, есть только ограниченное кол-во вариантов перехода
+      //из "нет соединения" в "авторизован" не прыгнуть
+      switch (this[SYMBOL_STATE]) {
+      //можем только подключиться или вылететь с ошибкой подключения
+      case CONST.STATE.NOT_CONNECTED:
+        if ([CONST.STATE.CONNECTED, CONST.STATE.ERRORED].indexOf(state) > -1) {
+          this[SYMBOL_STATE] = state;
+          this.activity = CONST.ACTIVITY.IDLE;
+        } else {
+          throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
         }
-				this.disconnectTimeout = setTimeout(this.disconnect.bind(this), 100);
-			}
-			//если идём на обрыв, то переподключение не запускаем
-			if ((CONST.STATE.NOT_CONNECTED === state) && (!this.isDead())) {
-				this.emit('beforeReconnect');
-				this.reconnect();
-			}
-			return true;
-		} else {
-			throw new Error('set: Unknown notWSServerClient state: ' + state);
-		}
-	}
+        break;
+        //можем повиснуть, авторизоваться вылететь с ошибкой
+      case CONST.STATE.CONNECTED:
+        if (
+          [
+            CONST.STATE.AUTHORIZED,
+            CONST.STATE.NO_PING,
+            CONST.STATE.ERRORED,
+            CONST.STATE.NOT_CONNECTED
+          ].indexOf(state) > -1) {
+          this[SYMBOL_STATE] = state;
+          this.activity = CONST.ACTIVITY.IDLE;
+        } else {
+          throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
+        }
+        break;
+        //можем потерять авторизацию, но продолжить висеть на линии
+        //повиснуть
+        //вылететь с ошибкой связи
+      case CONST.STATE.AUTHORIZED:
+        if (
+          [
+            CONST.STATE.CONNECTED,
+            CONST.STATE.NO_PING,
+            CONST.STATE.ERRORED,
+            CONST.STATE.NOT_CONNECTED
+          ].indexOf(state) > -1) {
+          this[SYMBOL_STATE] = state;
+          this.activity = CONST.ACTIVITY.IDLE;
+        } else {
+          throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
+        }
+        break;
+        ////из остояний разрыва связи, можно уйти только в "не подключен"
+        //можем только отключиться
+      case CONST.STATE.NO_PING:
+        if ([CONST.STATE.NOT_CONNECTED].indexOf(state) > -1) {
+          this[SYMBOL_STATE] = state;
+          this.activity = CONST.ACTIVITY.IDLE;
+        } else {
+          throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
+        }
+        break;
+        //можем только отключиться
+      case CONST.STATE.ERRORED:
+        if ([
+          CONST.STATE.NOT_CONNECTED,
+          CONST.STATE.ERRORED
+        ].indexOf(state) > -1) {
+          this[SYMBOL_STATE] = state;
+          this.activity = CONST.ACTIVITY.IDLE;
+        } else {
+          throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
+        }
+        break;
+      }
+      switch(this[SYMBOL_STATE]){
+        case CONST.STATE.NOT_CONNECTED:
+          //если идём на обрыв, то переподключение не запускаем
+          this.emit('disconnected');
+          if(this.isAlive()){
+            this.emit('beforeReconnect');
+            this.reconnect();
+          }
+          break;
+        case CONST.STATE.CONNECTED:  this.emit('connected');        break;
+        case CONST.STATE.AUTHORIZED:  this.emit('authorized');      break;
+        case CONST.STATE.NO_PING:
+          this.emit('noPing');
+          this.disconnectTimeout = setTimeout(this.disconnect.bind(this), 100);
+          break;
+        case CONST.STATE.ERRORED:
+          this.emit('errored');
+          this.disconnectTimeout = setTimeout(this.disconnect.bind(this), 100);
+          break;
+      }
+      return true;
+    } else {
+      throw new Error('set: Unknown notWSServerClient state: ' + state);
+    }
+  }
 
-	get activity() {
-		return this[SYMBOL_ACTIVITY];
-	}
+  get activity() {
+    return this[SYMBOL_ACTIVITY];
+  }
 
-	//
-	/*
+  //
+  /*
 IDLE: 0,
 //идёт подключение
 CONNECTING: 1,
@@ -577,37 +633,43 @@ TERMINATING: 3,
 //авторизация по токену
 AUTHORIZING: 4
 */
-	set activity(activity = CONST.ACTIVITY.IDLE) {
-		if (Object.values(CONST.ACTIVITY).indexOf(activity) > -1) {
-			this.emit('changeActivity', activity, CONST.ACTIVITY_NAME[activity]);
-			//для каждого варианта, есть только ограниченное кол-во вариантов перехода
-			//из "нет соединения" в "авторизован" не прыгнуть
-			switch (this[SYMBOL_ACTIVITY]) {
-			//можем только подключиться
-			case CONST.ACTIVITY.IDLE:
-				if ([
-					CONST.ACTIVITY.CONNECTING,
-					CONST.ACTIVITY.CLOSING,
-					CONST.ACTIVITY.TERMINATING,
-					CONST.ACTIVITY.AUTHORIZING
-				].indexOf(activity) > -1) {
-					this[SYMBOL_ACTIVITY] = activity;
-				}
-				break;
-			case CONST.ACTIVITY.CONNECTING:
-			case CONST.ACTIVITY.CLOSING:
-			case CONST.ACTIVITY.TERMINATING:
-			case CONST.ACTIVITY.AUTHORIZING:
-				if ([CONST.ACTIVITY.IDLE].indexOf(activity) > -1) {
-					this[SYMBOL_ACTIVITY] = activity;
-				}
-				break;
-			}
-			return true;
-		} else {
-			throw new Error('set: Unknown notWSServerClient activity: ' + activity);
-		}
-	}
+  set activity(activity = CONST.ACTIVITY.IDLE) {
+    if (Object.values(CONST.ACTIVITY).indexOf(activity) > -1) {
+      this.emit('changeActivity', activity, CONST.ACTIVITY_NAME[activity]);
+      //для каждого варианта, есть только ограниченное кол-во вариантов перехода
+      //из "нет соединения" в "авторизован" не прыгнуть
+      switch (this[SYMBOL_ACTIVITY]) {
+      //можем только подключиться
+      case CONST.ACTIVITY.IDLE:
+        if ([
+          CONST.ACTIVITY.CONNECTING,
+          CONST.ACTIVITY.CLOSING,
+          CONST.ACTIVITY.TERMINATING,
+          CONST.ACTIVITY.AUTHORIZING
+        ].indexOf(activity) > -1) {
+          this[SYMBOL_ACTIVITY] = activity;
+        }
+        break;
+      case CONST.ACTIVITY.CONNECTING:
+      case CONST.ACTIVITY.CLOSING:
+      case CONST.ACTIVITY.TERMINATING:
+      case CONST.ACTIVITY.AUTHORIZING:
+        if ([CONST.ACTIVITY.IDLE].indexOf(activity) > -1) {
+          this[SYMBOL_ACTIVITY] = activity;
+        }
+        break;
+      }
+      return true;
+    } else {
+      throw new Error('set: Unknown notWSServerClient activity: ' + activity);
+    }
+  }
+
+  destroy(){
+    clearInterval(this.connectInterval);
+    clearInterval(this.pingInterval);
+    clearTimeout(this.disconnectTimeout);
+  }
 }
 
 //env dep export

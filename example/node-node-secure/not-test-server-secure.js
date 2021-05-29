@@ -7,14 +7,15 @@ try {
   const express = require('express');
 
   const app = express();
-  const port = 13000;
+  const port = 23000;
+
   app.use(express.static(__dirname + '/public'));
   app.get('/api/token', (req, res) => {
     res.status(200).json({
       token: jwt.sign({
         user: 'guest',
         active: true,
-        exp: Date.now() / 1000 + (CONST.TOKEN_TTL /30)
+        exp: Date.now() / 1000 + (CONST.TOKEN_TTL / 30)
       }, JWT_KEY)
     });
     res.end();
@@ -22,6 +23,8 @@ try {
 
   app.listen(port, () => console.log(`Example app listening on port ${port}!`));
   const server = new notWSServer({
+    port: 14444,
+    logger: console,
     getMessenger() {
       return new notWSMessenger({
         secure: true,
@@ -29,16 +32,18 @@ try {
           'test': ['sayHello']
         },
         validators: {
-          credentials(credentials){
-            try{
+          credentials(credentials) {
+            try {
               let data = jwt.verify(credentials, JWT_KEY);
-              if(data && typeof data.active === 'boolean'){
+              if (data && typeof data.active === 'boolean') {
                 return data.active;
-              }else{
+              } else {
                 return false;
               }
-            }catch(e){
-              console.error(e);
+            } catch (e) {
+              if(e.name === 'TokenExpiredError'){
+                throw new Error(CONST.ERR_MSG.MSG_CREDENTIALS_IS_NOT_VALID)
+              }
               return false;
             }
           }
@@ -49,6 +54,13 @@ try {
     jwt: {
       key: JWT_KEY
     }
+  });
+  server.on('started', () => {
+    console.log('server started');
+  });
+  server.on('connection', (conn) => {
+    console.log('client connected');
+    conn.send('__service', 'test');
   });
   server.start();
   let lastCount = 0;
