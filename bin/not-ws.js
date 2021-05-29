@@ -45,7 +45,7 @@ const files = [
 		node: path.join(opts['out-node'], 'server.js')
 	},
 	{
-		tmpl: path.join(__dirname, '../tmpl/super.client.ejs'),
+		tmpl: path.join(__dirname, '../tmpl/client.ejs'),
 		node: path.join(opts['out-node'], 'client.js'),
 		browser: path.join(opts['out-browser'], 'client.js')
 	},

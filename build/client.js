@@ -7762,13 +7762,13 @@ var notWSClient = (function () {
 	      }
 
 	      this.setAlive();
-	      this.isTerminated = false;
-	      this.emit('connecting'); //Счётчик колиества попыток подключения:
+	      this.isTerminated = false; //Счётчик колиества попыток подключения:
 
 	      this.connCount++; //пытаемся подключиться к вебсокет сервису.
 
 	      let connURI = this.getConnectURI();
 	      this.emit('connectURI', connURI);
+	      this.activity = CONST.ACTIVITY.CONNECTING;
 	      this.ws = new WebSocket(connURI);
 	      this.bindSocketEvents();
 	    } catch (e) {
@@ -7940,10 +7940,8 @@ var notWSClient = (function () {
 	      }
 
 	      this.connectInterval = setInterval(() => {
-	        if (this.isAlive()) {
-	          if (!this.ws || this.ws.readyState === this.ws.CLOSED) {
-	            this.connect();
-	          }
+	        if (!this.ws || this.ws.readyState === this.ws.CLOSED) {
+	          this.connect();
 	        }
 	      }, timeout);
 	    }
@@ -8054,7 +8052,7 @@ var notWSClient = (function () {
 
 
 	  ping() {
-	    if (this.ws) {
+	    if (this.isOpen()) {
 	      this.ws.send('ping');
 	      this.emit('ping');
 	    }
@@ -8279,6 +8277,28 @@ var notWSClient = (function () {
 	          break;
 	      }
 
+	      switch (this[SYMBOL_ACTIVITY$1]) {
+	        case CONST.ACTIVITY.IDLE:
+	          this.emit('idle', this);
+	          break;
+
+	        case CONST.ACTIVITY.CONNECTING:
+	          this.emit('connecting', this);
+	          break;
+
+	        case CONST.ACTIVITY.AUTHORIZING:
+	          this.emit('authorizing', this);
+	          break;
+
+	        case CONST.ACTIVITY.CLOSING:
+	          this.emit('closing', this);
+	          break;
+
+	        case CONST.ACTIVITY.TERMINATING:
+	          this.emit('terminating', this);
+	          break;
+	      }
+
 	      return true;
 	    } else {
 	      throw new Error('set: Unknown notWSServerClient activity: ' + activity);
@@ -8289,6 +8309,8 @@ var notWSClient = (function () {
 	    clearInterval(this.connectInterval);
 	    clearInterval(this.pingInterval);
 	    clearTimeout(this.disconnectTimeout);
+	    this.emit('destroyed');
+	    this.removeAllListeners();
 	  }
 
 	} //env dep export
@@ -8414,11 +8436,9 @@ var notWSClient = (function () {
 	      this.logMsg('ready');
 	      this.emit('ready', this);
 	    });
-	    this.connection.on('ping', () => {
-	      this.logMsg('ping');
+	    this.connection.on('ping', () => {//this.logDebug('ping');
 	    });
-	    this.connection.on('pong', () => {
-	      this.logMsg('pong');
+	    this.connection.on('pong', () => {//this.logMsg('pong');
 	    });
 	  }
 
@@ -8743,7 +8763,7 @@ var notWSClient = (function () {
 
 	  message(type, name, payload) {
 	    if (payload !== 'pong' && payload !== 'ping') {
-	      this.logMsg('outgoing message', type, name);
+	      this.logDebug('outgoing message', type, name);
 	    }
 
 	    let message = this.messenger.pack(payload, {

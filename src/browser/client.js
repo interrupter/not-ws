@@ -114,10 +114,10 @@ class notWSClient extends EventEmitter{
 		});
 
 		this.connection.on('ping', ()=>{
-			this.logMsg('ping');
+			//this.logDebug('ping');
 		});
 		this.connection.on('pong', ()=>{
-			this.logMsg('pong');
+			//this.logMsg('pong');
 		});
 	}
 
@@ -417,7 +417,7 @@ class notWSClient extends EventEmitter{
 
 	message(type, name, payload){
 		if((payload!== 'pong') && ( payload!== 'ping')){
-			this.logMsg('outgoing message', type, name);
+			this.logDebug('outgoing message', type, name);
 		}
 		let message = this.messenger.pack(payload, {
 			type,
