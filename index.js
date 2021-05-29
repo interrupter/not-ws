@@ -1,11 +1,11 @@
 const CONST = require('./src/node/const');
-const LOG = require('./src/node/log');
+const Func = require('./src/node/func');
 
 const notWSServer = require('./src/node/server');
-const notWSServerClient = require('./src/node/server.client');
 const notWSRouter = require('./src/node/router');
 const notWSMessenger = require('./src/node/messenger');
 const notWSClient = require('./src/node/client');
+const initialize = require('./src/node/initialize');
 
 const path = require('path');
 
@@ -14,11 +14,11 @@ module.exports = {
 	paths: {
 		controllers:	path.join(__dirname, 'src', 'controllers')
 	},
+	initialize,
 	notWSServer,
-	notWSServerClient,
 	notWSRouter,
 	notWSMessenger,
 	notWSClient,
 	CONST,
-	LOG
+	Func
 };

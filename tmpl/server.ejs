@@ -37,7 +37,9 @@ class notWSServer extends EventEmitter{
       connection = {},
       jwt,
       getRouter,
+      routes,
       getMessenger,
+      messenger,
       credentials,
       logger
     }){
@@ -54,6 +56,9 @@ class notWSServer extends EventEmitter{
 		this.logDebug = logger?logger.debug:()=>{};
 		this.logError = logger?logger.error:()=>{};
 
+    this.routes = routes;
+    this.messenger = messenger;
+    
     this.wsServer   = null;
     this.isClosing   = false;
     this.wsClients  = [];
@@ -186,13 +191,13 @@ class notWSServer extends EventEmitter{
 
   getMessengerForClient(conn, req){
     if(Func.isFunc(this.getMessenger)){
-      return this.getMessenger(conn, req);
+      return this.getMessenger(conn, req, this.messenger);
     }
   }
 
   getRouterForClient(conn, req){
     if(Func.isFunc(this.getRouter)){
-      return this.getRouter(conn, req);
+      return this.getRouter(conn, req, this.routes);
     }
   }
 
