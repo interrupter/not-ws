@@ -18,62 +18,68 @@
       }
     }
     const client = new notWSClient({
-      options: {
+      connection: {
         host: 'localhost',
-        port: 12000,
+        port: 15000,
         path: '',
         secure: true,
-        ping: true,
-        getToken() {
+        ping: true
+      },
+      getToken() {
           var headers = new Headers();
           headers.append('pragma', 'no-cache');
           headers.append('cache-control', 'no-cache');
-          return fetch('http://localhost:13000/api/token', {method: 'GET', headers}).then(getJSON).then((json) => {
+          return fetch('http://localhost:15001/api/token', {method: 'GET', headers}).then(getJSON).then((json) => {
             console.log('token', json.token);
             return json.token;
           });
+      },
+      messenger: {
+        secure: false,
+        types: {
+          'test': ['sayHello'],
+          '__service': ['updateToken'],
+          'response': ['myName'],
+          'request': ['myName']
         },
-        messenger:{
-          secure: false,
-          types: {
-            'test': ['sayHello'],
-            '__service': ['updateToken'],
-            'response': ['myName'],
-            'request': ['myName']
-          },
-        }
-      }
+        logger: console
+      },
+      router:{
+        logger: console
+      },
+      logger: console
+
+    });
+    client.on('tokenUpdated', (token)=>{
+      console.info('token updated', token);
     });
     //when
     client.once('ready', () => {
       //sending test message, with credetials
-      client.send('test', 'sayHello', {
+      client.message('test', 'sayHello', {
         test: true
       });
-      client.on('tokenUpdated', (token)=>{
-        console.info('token updated', token);
-      })
       //now send with experied credentials
       setTimeout(
         () => {
           setInterval(()=>{
-            client.send('test', 'sayHello', {
+            client.message('test', 'sayHello', {
               test: true
             });
-          }, 20000);
+          }, 5000);
         }, 1000);
         //now send with experied credentials
         setTimeout(
           () => {
             setInterval(()=>{
               let msgToSenf = { a: Math.ceil(Math.random()*10), b: Math.ceil(Math.random()*10)};
-              client.sendRequest('myName', msgToSenf)
+              client.request('myName', msgToSenf)
                 .then((msg)=>{
                   console.log('response on request myName');
                   console.log(`${msgToSenf.a} + ${msgToSenf.b} = ${msg.payload.c}`);
                 })
                 .catch(console.error);
-            }, 30000);
+            }, 10000);
           }, 4000);
     });
   </script>

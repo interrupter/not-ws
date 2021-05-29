@@ -7,7 +7,7 @@ try {
   const jwt = require('jsonwebtoken');
   const express = require('express');
   const app = express();
-  const port = 13000;
+  const port = 15001;
   var i = 0;
   app.use(express.static(__dirname + '/public'));
   app.get('/api/token', (req, res) => {
@@ -15,7 +15,7 @@ try {
       token: jwt.sign({
         user: 'guest',
         active: true,
-        exp: Date.now() / 1000 + (CONST.TOKEN_TTL /30)
+        exp: Date.now() / 1000 + (CONST.TOKEN_TTL / 30)
       }, JWT_KEY)
     });
     res.end();
@@ -23,18 +23,28 @@ try {
 
   app.listen(port, () => console.log(`Example app listening on port ${port}!`));
   const server = new notWSServer({
-    getRouter(){
-      return new notWSRouter({}, {
-        request:{
-          myName(data, cred, conn){
-            console.log('request myName', data);
-            return Promise.resolve({name: 'testServer'+(i++), c: data.a+data.b});
-          }
-        },
-        test:{
-          sayHello(data, cred, conn){
-            console.log('say hello to my new friend');
-            return Promise.resolve(null);
+    connection: {
+      port: 15000,
+      secure: true
+    },
+    getRouter() {
+      return new notWSRouter({
+        logger: console,
+        routes: {
+          request: {
+            myName({data, cred, conn}) {
+              console.log('request myName', data);
+              return Promise.resolve({
+                name: 'testServer' + (i++),
+                c: data.a + data.b
+              });
+            }
+          },
+          test: {
+            sayHello({data, cred, conn}) {
+              console.log('say hello to my new friend');
+              return Promise.resolve(null);
+            }
           }
         }
       });
@@ -42,20 +52,21 @@ try {
     getMessenger() {
       return new notWSMessenger({
         secure: true,
+        logger: console,
         types: {
           'test': ['sayHello'],
           'request': ['myName']
         },
         validators: {
-          credentials(credentials){
-            try{
+          credentials(credentials) {
+            try {
               let data = jwt.verify(credentials, JWT_KEY);
-              if(data && typeof data.active === 'boolean'){
+              if (data && typeof data.active === 'boolean') {
                 return data.active;
-              }else{
+              } else {
                 return false;
               }
-            }catch(e){
+            } catch (e) {
               console.error(e);
               return false;
             }
@@ -63,7 +74,7 @@ try {
         }
       })
     },
-    secure: true,
+    logger: console,
     jwt: {
       key: JWT_KEY
     }

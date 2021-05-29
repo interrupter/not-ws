@@ -27,6 +27,9 @@ class notWSConnection extends EventEmitter{
 			if(this.ws.readyState === 1){
 				this.setAlive(); //результат пинг запросов
 				this[SYMBOL_STATE] = CONST.STATE.CONNECTED;
+				if(this.options.secure){
+					this[SYMBOL_STATE] = CONST.STATE.AUTHORIZED;
+				}
 			}else{
 				this[SYMBOL_STATE] = CONST.STATE.NOT_CONNECTED;
 				this.setDead(); //результат пинг запросов
@@ -69,11 +72,27 @@ class notWSConnection extends EventEmitter{
 		return this.ws;
 	}
 
+	getIP(){
+		if(this.isOpen()){
+			return this.ws._socket.remoteAddress;
+		}else{
+			return false;
+		}
+	}
+
 	bindSocketEvents(){
 		if(this.ws){
+			this.listeners = {
+				open: this.onOpen.bind(this),
+				message: this.onMessage.bind(this),
+				close: this.onClose.bind(this),
+				error: this.onError.bind(this)
+			};
     
-			this.ws.onopen = this.onOpen.bind(this);
-			this.ws.error = this.onError.bind(this);
+			this.ws.onopen = this.listeners.open;
+			this.ws.onmessage = this.listeners.message;
+			this.ws.onclose = this.listeners.close;
+			this.ws.onerror = this.listeners.error;
     
 		}
 	}
@@ -94,6 +113,9 @@ class notWSConnection extends EventEmitter{
 			//заменяем метод для onclose на пустую функцию.
       
 			this.ws.onclose = Func.noop;
+			this.ws.onerror = Func.noop;
+			this.ws.onmessage = Func.noop;
+			this.ws.onopen = Func.noop;
       
 			//закрываем подключение.
 			this.ws.close && this.ws.close();
@@ -146,11 +168,6 @@ class notWSConnection extends EventEmitter{
 		}else{
 			this.setDead();
 		}
-	}
-
-	setHalfAlive(){
-		this._alive = true;
-		this.setAlive();
 	}
 
 	setAlive(){
@@ -266,10 +283,6 @@ class notWSConnection extends EventEmitter{
 		} else {
 			this.state = CONST.STATE.ERRORED;
 		}
-
-		if(this.isAutoReconnect()){
-			this.scheduleReconnect();
-		}
 	}
 
 	suicide() {
@@ -285,20 +298,19 @@ class notWSConnection extends EventEmitter{
 	}
 
 	scheduleReconnect(){
-		if(!this.slave){
+		if (!this.slave) {
 			let timeout = this.getReconnectTimeout();
-			this.emit('reconnectioningEvery', timeout);
-			if (this.connectInterval){
+			this.emit('reconnectiningEvery', timeout);
+			if (this.connectInterval) {
 				clearInterval(this.connectInterval);
 			}
-			this.connectInterval = setInterval(
-				()=>{
-					if((!this.ws) || (this.ws.readyState === this.ws.CLOSED)){
-						this.connect();
-					}
-				},
-				timeout
-			);
+			this.connectInterval = setInterval(this.performReconnect.bind(this), timeout);
+		}
+	}
+
+	performReconnect(){
+		if (!this.ws || this.ws.readyState === this.ws.CLOSED) {
+			this.connect();
 		}
 	}
 
@@ -387,12 +399,20 @@ class notWSConnection extends EventEmitter{
 	sendPing(){
 		if(!this.isAlive()){
 			this.emit('noPong');
-			this.disconnect();
-			this.scheduleReconnect();
+			if(this.state === CONST.STATE.CONNECTED){
+				this.state = CONST.STATE.NOT_CONNECTED;
+			}
 			return;
 		}
 		this.setHalfDead();
 		this.ping();
+	}
+
+	pong(){
+		if(this.isOpen()){
+			this.ws.send('pong');
+			this.emit('pong');
+		}
 	}
 
 	/**
@@ -413,9 +433,15 @@ class notWSConnection extends EventEmitter{
   * @returns {boolean}  if it 'pong' message
   **/
 	checkPingMsg(msg){
+		if (msg === 'ping'){
+			this.setAlive();
+			this.emit('pinged');
+			this.pong();
+			return true;
+		}
 		if (msg === 'pong'){
-			this.setHalfAlive();
-			this.emit('pong');
+			this.setAlive();
+			this.emit('ponged');
 			return true;
 		}
 		return false;
@@ -557,6 +583,10 @@ class notWSConnection extends EventEmitter{
 				if(this.isAlive()){
 					this.emit('beforeReconnect');
 					this.reconnect();
+				}else{
+					if(this.isAutoReconnect()){
+						this.scheduleReconnect();
+					}
 				}
 				break;
 			case CONST.STATE.CONNECTED:  this.emit('connected');        break;

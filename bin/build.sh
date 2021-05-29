@@ -18,4 +18,4 @@ done
 NODE_ENV=$ENV ./bin/not-ws.js --out-node $OUT_NODE --out-browser $OUT_BROWSER
 NODE_ENV=$ENV ./node_modules/.bin/rollup -c ./rollup/client.browser.js
 NODE_ENV=$ENV ./node_modules/.bin/terser --compress --mangle -- build/client.js > ./build/client.min.js
-cp ./build/client.js ./example/node-browser-secure/public
+cp ./build/client.js ./example/node-browser/public

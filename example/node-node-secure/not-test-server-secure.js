@@ -3,6 +3,7 @@ try {
   const notWSServer = require('../../src/node/server.js');
   const CONST = require('../../src/node/const.js');
   const notWSMessenger = require('../../src/node/messenger.js');
+  const notWSRouter = require('../../src/node/router.js');
   const jwt = require('jsonwebtoken');
   const express = require('express');
 
@@ -23,8 +24,16 @@ try {
 
   app.listen(port, () => console.log(`Example app listening on port ${port}!`));
   const server = new notWSServer({
-    port: 14444,
+    connection:{
+      port: 14444,
+      secure: true,
+    },
     logger: console,
+    getRouter(){
+      return new notWSRouter({
+        logger: console
+      });
+    },
     getMessenger() {
       return new notWSMessenger({
         secure: true,
@@ -50,7 +59,6 @@ try {
         }
       })
     },
-    secure: true,
     jwt: {
       key: JWT_KEY
     }

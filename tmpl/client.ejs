@@ -24,6 +24,7 @@
 * @params {notWSRouter}     router            - request handler
 * @params {object}          logger            - log interface {function:log, function:debug, function:error}
 * @params {boolean}         slave             - true - this is server child connection for remote client, false - it is connection to another server
+* @params {Array<string>}   debug             - list of features to debug and show more information
 *
 **/
 
@@ -37,13 +38,20 @@ class notWSClient extends EventEmitter{
     logger,
     identity,          //user information
     credentials,        //client creds for access
-    slave = false
+    slave = false,
+    debug = []
   }){
-    if(!router || !(router instanceof notWSRouter)){
+    if(!router){
       throw new Error('Router is not set or is not instance of notWSRouter');
     }
-    if(!messenger || !(messenger instanceof notWSMessenger)){
+    if(!(router instanceof notWSRouter)){
+      router = new notWSRouter(router);
+    }
+    if(!messenger){
       throw new Error('Messenger is not set or is not instance of notWSMessenger');
+    }
+    if (!(messenger instanceof notWSMessenger)){
+      messenger = new notWSMessenger(messenger);
     }
     super();
     //Основные параметры
@@ -59,6 +67,7 @@ class notWSClient extends EventEmitter{
     this.messenger = messenger;
     this.router =   router;
     this.slave = slave;
+    this.debug = debug;
     //Подключение к WS
     this.initConnection(connection, this.slave);
     if(!this.slave){
@@ -81,6 +90,10 @@ class notWSClient extends EventEmitter{
       this.connect();
     }
     return this;
+  }
+
+  getIP(){
+    return this.connection?this.connection.getIP():false;
   }
 
 
@@ -109,12 +122,21 @@ class notWSClient extends EventEmitter{
       this.emit('ready', this);
     });
 
-    this.connection.on('ping', ()=>{
-      //this.logDebug('ping');
-    });
-    this.connection.on('pong', ()=>{
-      //this.logMsg('pong');
-    });
+    if(this.connect.debug && this.connect.debug.includes('ping')){
+      this.connection.on('ping', ()=>{
+        this.logDebug('ping');
+      });
+      this.connection.on('pong', ()=>{
+        this.logDebug('pong');
+      });
+
+      this.connection.on('pinged', ()=>{
+        this.logDebug('pinged');
+      });
+      this.connection.on('ponged', ()=>{
+        this.logDebug('ponged');
+      });
+    }
   }
 
   async connect(){
@@ -148,6 +170,12 @@ class notWSClient extends EventEmitter{
     this.connection.destroy();
   }
 
+  destroy(){
+    clearInterval(this.getTimeOffsetInt);
+    this.emit('destroyed');
+    this.removeAllListeners();
+  }
+
   isDead() {
     return !this.connection.isAlive();
   }
@@ -175,6 +203,7 @@ class notWSClient extends EventEmitter{
   <%- include('./client.requests.ejs'); %>
 
   <% if (env == 'node'){ %>
+
   getCredentials() {
     return this.options.credentials;
   }
@@ -215,7 +244,6 @@ class notWSClient extends EventEmitter{
       return false;
     }
   }
-
   <% } %>
 
   //Получение токена.
@@ -371,10 +399,8 @@ class notWSClient extends EventEmitter{
           if (response === CONST.ERR_MSG.REQUEST_TIMEOUT_MESSAGE) {
             return reject(response);
           }
-          if (this.messenger.validate(response)) {
-            if (this.messenger.isErrored(response)) {
-              return reject(response);
-            }
+          if (this.messenger.isErrored(response)) {
+            return reject(response);
           }
           resolve(response);
         }, secure);

@@ -687,6 +687,17 @@ var notWSClient = (function () {
 	          this.emit('updateToken');
 	          return Promise.resolve();
 	        }
+	      },
+	      test: {
+	        sayHello: () => {
+	          this.logMsg('Say hello for test route!');
+	          return Promise.resolve(true);
+	        }
+	      },
+	      request: {
+	        auth: () => {
+	          this.logMsg('request.auth');
+	        }
 	      }
 	    };
 
@@ -720,7 +731,7 @@ var notWSClient = (function () {
 	    cred
 	  }, data, conn) {
 	    if (Func.ObjHas(this.routes, type) && Func.ObjHas(this.routes[type], name)) {
-	      this.logMsg(conn.ip, type, name);
+	      this.logMsg('ip:', conn._socket ? conn._socket.remoteAddress : 'no ip info', type, name);
 	      return this.routes[type][name]({
 	        data,
 	        cred,
@@ -7382,13 +7393,98 @@ var notWSClient = (function () {
 
 	var validator = unwrapExports(validator_1);
 
-	const {
-	  v4: uuidv4
-	} = require('uuid');
+	var rngBrowser = createCommonjsModule(function (module) {
+	// Unique ID creation requires a high quality random # generator.  In the
+	// browser this is a little complicated due to unknown quality of Math.random()
+	// and inconsistent support for the `crypto` API.  We do the best we can via
+	// feature-detection
+
+	// getRandomValues needs to be invoked in a context where "this" is a Crypto
+	// implementation. Also, find the complete implementation of crypto on IE11.
+	var getRandomValues = (typeof(crypto) != 'undefined' && crypto.getRandomValues && crypto.getRandomValues.bind(crypto)) ||
+	                      (typeof(msCrypto) != 'undefined' && typeof window.msCrypto.getRandomValues == 'function' && msCrypto.getRandomValues.bind(msCrypto));
+
+	if (getRandomValues) {
+	  // WHATWG crypto RNG - http://wiki.whatwg.org/wiki/Crypto
+	  var rnds8 = new Uint8Array(16); // eslint-disable-line no-undef
+
+	  module.exports = function whatwgRNG() {
+	    getRandomValues(rnds8);
+	    return rnds8;
+	  };
+	} else {
+	  // Math.random()-based (RNG)
+	  //
+	  // If all else fails, use Math.random().  It's fast, but is of unspecified
+	  // quality.
+	  var rnds = new Array(16);
+
+	  module.exports = function mathRNG() {
+	    for (var i = 0, r; i < 16; i++) {
+	      if ((i & 0x03) === 0) r = Math.random() * 0x100000000;
+	      rnds[i] = r >>> ((i & 0x03) << 3) & 0xff;
+	    }
+
+	    return rnds;
+	  };
+	}
+	});
+
+	/**
+	 * Convert array of 16 byte values to UUID string format of the form:
+	 * XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+	 */
+	var byteToHex = [];
+	for (var i = 0; i < 256; ++i) {
+	  byteToHex[i] = (i + 0x100).toString(16).substr(1);
+	}
+
+	function bytesToUuid(buf, offset) {
+	  var i = offset || 0;
+	  var bth = byteToHex;
+	  // join used to fix memory issue caused by concatenation: https://bugs.chromium.org/p/v8/issues/detail?id=3175#c4
+	  return ([bth[buf[i++]], bth[buf[i++]], 
+		bth[buf[i++]], bth[buf[i++]], '-',
+		bth[buf[i++]], bth[buf[i++]], '-',
+		bth[buf[i++]], bth[buf[i++]], '-',
+		bth[buf[i++]], bth[buf[i++]], '-',
+		bth[buf[i++]], bth[buf[i++]],
+		bth[buf[i++]], bth[buf[i++]],
+		bth[buf[i++]], bth[buf[i++]]]).join('');
+	}
+
+	var bytesToUuid_1 = bytesToUuid;
+
+	function v4(options, buf, offset) {
+	  var i = buf && offset || 0;
+
+	  if (typeof(options) == 'string') {
+	    buf = options === 'binary' ? new Array(16) : null;
+	    options = null;
+	  }
+	  options = options || {};
+
+	  var rnds = options.random || (options.rng || rngBrowser)();
+
+	  // Per 4.4, set bits for version and `clock_seq_hi_and_reserved`
+	  rnds[6] = (rnds[6] & 0x0f) | 0x40;
+	  rnds[8] = (rnds[8] & 0x3f) | 0x80;
+
+	  // Copy bytes to buffer, if provided
+	  if (buf) {
+	    for (var ii = 0; ii < 16; ++ii) {
+	      buf[i + ii] = rnds[ii];
+	    }
+	  }
+
+	  return buf || bytesToUuid_1(rnds);
+	}
+
+	var v4_1 = v4;
+
 	/**
 	 * set of default options
 	 */
-
 
 	const DEFAULT_OPTIONS = {
 	  validateType: true,
@@ -7451,12 +7547,16 @@ var notWSClient = (function () {
 	  }
 
 	  getServiceData(msg) {
-	    return {
-	      id: msg.id,
-	      time: msg.time,
-	      type: msg.type,
-	      name: msg.name
-	    };
+	    if (Func.ObjHas(msg, 'service')) {
+	      return msg.service;
+	    } else {
+	      return {
+	        id: msg.id,
+	        time: msg.time,
+	        type: msg.type,
+	        name: msg.name
+	      };
+	    }
 	  }
 
 	  getType(msg) {
@@ -7504,7 +7604,7 @@ var notWSClient = (function () {
 	    }
 
 	    let msg = {
-	      id: uuidv4(),
+	      id: v4_1(),
 	      time: new Date().getTime(),
 	      payload
 	    };
@@ -7662,6 +7762,10 @@ var notWSClient = (function () {
 	        this.setAlive(); //результат пинг запросов
 
 	        this[SYMBOL_STATE$1] = CONST.STATE.CONNECTED;
+
+	        if (this.options.secure) {
+	          this[SYMBOL_STATE$1] = CONST.STATE.AUTHORIZED;
+	        }
 	      } else {
 	        this[SYMBOL_STATE$1] = CONST.STATE.NOT_CONNECTED;
 	        this.setDead(); //результат пинг запросов
@@ -7709,10 +7813,26 @@ var notWSClient = (function () {
 	    return this.ws;
 	  }
 
+	  getIP() {
+	    if (this.isOpen()) {
+	      return this.ws._socket.remoteAddress;
+	    } else {
+	      return false;
+	    }
+	  }
+
 	  bindSocketEvents() {
 	    if (this.ws) {
-	      this.ws.onopen = this.onOpen.bind(this);
-	      this.ws.error = this.onError.bind(this);
+	      this.listeners = {
+	        open: this.onOpen.bind(this),
+	        message: this.onMessage.bind(this),
+	        close: this.onClose.bind(this),
+	        error: this.onError.bind(this)
+	      };
+	      this.ws.onopen = this.listeners.open;
+	      this.ws.onmessage = this.listeners.message;
+	      this.ws.onclose = this.listeners.close;
+	      this.ws.onerror = this.listeners.error;
 	    }
 	  }
 
@@ -7727,7 +7847,10 @@ var notWSClient = (function () {
 
 	    if (this.ws) {
 	      //заменяем метод для onclose на пустую функцию.
-	      this.ws.onclose = Func.noop; //закрываем подключение.
+	      this.ws.onclose = Func.noop;
+	      this.ws.onerror = Func.noop;
+	      this.ws.onmessage = Func.noop;
+	      this.ws.onopen = Func.noop; //закрываем подключение.
 
 	      this.ws.close && this.ws.close();
 	      this.terminate();
@@ -7783,11 +7906,6 @@ var notWSClient = (function () {
 	    } else {
 	      this.setDead();
 	    }
-	  }
-
-	  setHalfAlive() {
-	    this._alive = true;
-	    this.setAlive();
 	  }
 
 	  setAlive() {
@@ -7912,10 +8030,6 @@ var notWSClient = (function () {
 	    } else {
 	      this.state = CONST.STATE.ERRORED;
 	    }
-
-	    if (this.isAutoReconnect()) {
-	      this.scheduleReconnect();
-	    }
 	  }
 
 	  suicide() {
@@ -7933,17 +8047,19 @@ var notWSClient = (function () {
 	  scheduleReconnect() {
 	    if (!this.slave) {
 	      let timeout = this.getReconnectTimeout();
-	      this.emit('reconnectioningEvery', timeout);
+	      this.emit('reconnectiningEvery', timeout);
 
 	      if (this.connectInterval) {
 	        clearInterval(this.connectInterval);
 	      }
 
-	      this.connectInterval = setInterval(() => {
-	        if (!this.ws || this.ws.readyState === this.ws.CLOSED) {
-	          this.connect();
-	        }
-	      }, timeout);
+	      this.connectInterval = setInterval(this.performReconnect.bind(this), timeout);
+	    }
+	  }
+
+	  performReconnect() {
+	    if (!this.ws || this.ws.readyState === this.ws.CLOSED) {
+	      this.connect();
 	    }
 	  }
 
@@ -8038,13 +8154,23 @@ var notWSClient = (function () {
 	  sendPing() {
 	    if (!this.isAlive()) {
 	      this.emit('noPong');
-	      this.disconnect();
-	      this.scheduleReconnect();
+
+	      if (this.state === CONST.STATE.CONNECTED) {
+	        this.state = CONST.STATE.NOT_CONNECTED;
+	      }
+
 	      return;
 	    }
 
 	    this.setHalfDead();
 	    this.ping();
+	  }
+
+	  pong() {
+	    if (this.isOpen()) {
+	      this.ws.send('pong');
+	      this.emit('pong');
+	    }
 	  }
 	  /**
 	  * Ping connection
@@ -8065,9 +8191,16 @@ var notWSClient = (function () {
 
 
 	  checkPingMsg(msg) {
+	    if (msg === 'ping') {
+	      this.setAlive();
+	      this.emit('pinged');
+	      this.pong();
+	      return true;
+	    }
+
 	    if (msg === 'pong') {
-	      this.setHalfAlive();
-	      this.emit('pong');
+	      this.setAlive();
+	      this.emit('ponged');
 	      return true;
 	    }
 
@@ -8206,6 +8339,10 @@ var notWSClient = (function () {
 	          if (this.isAlive()) {
 	            this.emit('beforeReconnect');
 	            this.reconnect();
+	          } else {
+	            if (this.isAutoReconnect()) {
+	              this.scheduleReconnect();
+	            }
 	          }
 
 	          break;
@@ -8335,6 +8472,7 @@ var notWSClient = (function () {
 	* @params {notWSRouter}     router            - request handler
 	* @params {object}          logger            - log interface {function:log, function:debug, function:error}
 	* @params {boolean}         slave             - true - this is server child connection for remote client, false - it is connection to another server
+	* @params {Array<string>}   debug             - list of features to debug and show more information
 	*
 	**/
 
@@ -8350,14 +8488,23 @@ var notWSClient = (function () {
 	    //user information
 	    credentials,
 	    //client creds for access
-	    slave = false
+	    slave = false,
+	    debug = []
 	  }) {
-	    if (!router || !(router instanceof notWSRouter)) {
+	    if (!router) {
 	      throw new Error('Router is not set or is not instance of notWSRouter');
 	    }
 
-	    if (!messenger || !(messenger instanceof notWSMessenger)) {
+	    if (!(router instanceof notWSRouter)) {
+	      router = new notWSRouter(router);
+	    }
+
+	    if (!messenger) {
 	      throw new Error('Messenger is not set or is not instance of notWSMessenger');
+	    }
+
+	    if (!(messenger instanceof notWSMessenger)) {
+	      messenger = new notWSMessenger(messenger);
 	    }
 
 	    super(); //Основные параметры
@@ -8376,7 +8523,8 @@ var notWSClient = (function () {
 	    this.credentials = credentials;
 	    this.messenger = messenger;
 	    this.router = router;
-	    this.slave = slave; //Подключение к WS
+	    this.slave = slave;
+	    this.debug = debug; //Подключение к WS
 
 	    this.initConnection(connection, this.slave);
 
@@ -8409,6 +8557,10 @@ var notWSClient = (function () {
 	    return this;
 	  }
 
+	  getIP() {
+	    return this.connection ? this.connection.getIP() : false;
+	  }
+
 	  initConnection(connection) {
 	    this.connection = new notWSConnection(connection);
 	    this.connection.on('disconnected', () => {
@@ -8436,10 +8588,21 @@ var notWSClient = (function () {
 	      this.logMsg('ready');
 	      this.emit('ready', this);
 	    });
-	    this.connection.on('ping', () => {//this.logDebug('ping');
-	    });
-	    this.connection.on('pong', () => {//this.logMsg('pong');
-	    });
+
+	    if (this.connect.debug && this.connect.debug.includes('ping')) {
+	      this.connection.on('ping', () => {
+	        this.logDebug('ping');
+	      });
+	      this.connection.on('pong', () => {
+	        this.logDebug('pong');
+	      });
+	      this.connection.on('pinged', () => {
+	        this.logDebug('pinged');
+	      });
+	      this.connection.on('ponged', () => {
+	        this.logDebug('ponged');
+	      });
+	    }
 	  }
 
 	  async connect() {
@@ -8472,6 +8635,12 @@ var notWSClient = (function () {
 	  terminate() {
 	    this.connection.terminate();
 	    this.connection.destroy();
+	  }
+
+	  destroy() {
+	    clearInterval(this.getTimeOffsetInt);
+	    this.emit('destroyed');
+	    this.removeAllListeners();
 	  }
 
 	  isDead() {
@@ -8747,10 +8916,8 @@ var notWSClient = (function () {
 	            return reject(response);
 	          }
 
-	          if (this.messenger.validate(response)) {
-	            if (this.messenger.isErrored(response)) {
-	              return reject(response);
-	            }
+	          if (this.messenger.isErrored(response)) {
+	            return reject(response);
 	          }
 
 	          resolve(response);

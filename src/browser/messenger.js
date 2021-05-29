@@ -3,7 +3,7 @@ import validator from 'validator';
 import EventEmitter from 'wolfy87-eventemitter';
 import CONST from './const.js';
 import Func from './func.js';
-const { v4: uuidv4 } = require('uuid');
+import uuidv4 from 'uuid/v4';
 
 /**
  * set of default options
@@ -62,12 +62,16 @@ class notWSMessenger extends EventEmitter {
 	}
 
 	getServiceData(msg) {
-		return {
-			id: msg.id,
-			time: msg.time,
-			type: msg.type,
-			name: msg.name,
-		};
+		if(Func.ObjHas(msg, 'service')){
+			return msg.service;
+		}else{
+			return {
+				id: msg.id,
+				time: msg.time,
+				type: msg.type,
+				name: msg.name,
+			};
+		}
 	}
 
 	getType(msg) {

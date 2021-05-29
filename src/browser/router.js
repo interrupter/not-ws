@@ -21,6 +21,17 @@ class notWSRouter extends EventEmitter{
 					this.emit('updateToken');
 					return Promise.resolve();
 				}
+			},
+			test: {
+				sayHello:()=>{
+					this.logMsg('Say hello for test route!');
+					return Promise.resolve(true);
+				}
+			},
+			request:{
+				auth:()=>{
+					this.logMsg('request.auth');
+				}
 			}
 		};
 		if(routes && Object.keys(routes).length > 0 ){
@@ -50,7 +61,7 @@ class notWSRouter extends EventEmitter{
 			Func.ObjHas(this.routes, type) &&
       Func.ObjHas(this.routes[type], name)
 		){
-			this.logMsg(conn.ip, type, name);
+			this.logMsg('ip:', conn._socket?conn._socket.remoteAddress:'no ip info', type, name);
 			return this.routes[type][name]({data, cred, conn});
 		}
 		throw (new Error(`Route not found ${type}/${name}`));

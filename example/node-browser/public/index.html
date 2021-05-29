@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <script src="./validator.min.js"></script>
+  <script src="./client.js"></script>
+
+</head>
+
+<body>
+  <script>
+    const client = new notWSClient({
+      connection:{
+        host: 'localhost',
+        port: 15000,
+        path: '',
+        secure: false,
+        ping: true
+      },
+      messenger: {
+        secure: false,
+        types: {
+          'test': ['sayHello'],
+          '__service': ['updateToken'],
+          'response': ['myName'],
+          'request': ['myName']
+        },
+        logger: console
+      },
+      router:{
+        logger: console
+      },
+      logger: console
+    });
+    client.on('ready', ()=>{
+      setTimeout(()=>{
+        client.message('test', 'sayHello', {test: true});
+      }, 1000);
+    });
+  </script>
+</body>
+
+</html>

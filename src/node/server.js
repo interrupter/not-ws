@@ -1,259 +1,260 @@
-const url          = require('url');
-const ws    = require('ws');
-const EventEmitter = require('events');
-const jwt         = require('jsonwebtoken');
+const url           = require('url');
+const ws            = require('ws');
+const EventEmitter  = require('events');
+const jwt           = require('jsonwebtoken');
 
 const CONST = require('./const.js');
 const Func = require('./func.js');
-const notWSRouter = require('./router.js');
 
 const notWSClient = require('./client.js');
-const notWSMessage = require('./messenger.js');
 
-const DEFAULT_OPTIONS = {
-  port: 12000,
-  ping: true,
-  routes:{
-    test: {
-      sayHello(){
-        // eslint-disable-next-line no-console
-        console.log('Say hello for test route!');
-        return Promise.resolve(true);
-      }
-    },
-    request:{
-      auth(){
-        // eslint-disable-next-line no-console
-        console.log('request.auth');
-      }
-    }
-  },
-  //ретрансляция сообщений
-  relay: null,
+const DEFAULT_CONNECTION = {
+	port: 12000,
+	ping: true,
+	secure: true,
+	//ретрансляция сообщений
+	relay: null,
 };
 
 class notWSServer extends EventEmitter{
-  /**
-  *  options.server   - express http/s server
-  *  options.port    -  server port
-  *  options.routes  -  client routes
-  *  options.event.onmessage  -  when client sends a message
-  */
-  constructor(options = {}){
-    super();
-    let logger = options.logger;
-    this.options = Object.assign({}, DEFAULT_OPTIONS, options);
 
-    this.logMsg = logger?logger.log:()=>{};
+	/**
+  *  connection           -   connection params
+  *  connection.server    -   express http/s server
+  *  connection.port      -   server port
+  *  connection.secure    -   auth required
+  *  connection.ping      -   ping clients
+  *  connection.relay     -   should pass incoming message to specified interface
+  *  connection.interface -   relay interface
+  *  jwt                  -   JWT token options
+  *  jwt.key              -   JWT key
+  *  getRouter            -   getter/factory for client router function(conn, req)
+  *  getMessenger         -   getter/factory for client messenger function(conn, req)
+  *  credentials          -   creds
+  **/
+
+	constructor({
+		connection = {},
+		jwt,
+		getRouter,
+		getMessenger,
+		credentials,
+		logger
+	}){
+		if(!Func.isFunc(getRouter)){
+			throw new Error('getRouter is not function');
+		}
+		if(!Func.isFunc(getMessenger)){
+			throw new Error('getMessenger is not function');
+		}
+		super();
+		this.connection = Object.assign({}, DEFAULT_CONNECTION, connection);
+
+		this.logMsg = logger?logger.log:()=>{};
 		this.logDebug = logger?logger.debug:()=>{};
 		this.logError = logger?logger.error:()=>{};
 
-    this.wsServer   = null;
-    this.isClosing   = false;
-    this.wsClients  = [];
-    this.wsMaxConns = 100;
-    this.clientRouter = new notWSRouter({routes: this.options.routes});
-    this.intPingPong = null;
-    return this;
-  }
+		this.wsServer   = null;
+		this.isClosing   = false;
+		this.wsClients  = [];
+		this.wsMaxConns = 100;
 
-  start(){
-    let opts = {};
-    if(this.options.server){
-       opts.server = this.options.server;
-    }
-    if(!isNaN(this.options.port) && this.options.port){
-      opts.port = this.options.port;
-    }
-    if(this.options.host){
-      opts.host = this.options.host;
-    }
-    if(opts.host || opts.port || opts.server){
-      this.wsServer = new ws.Server(opts);
-      if(this.options.ping){
-        this.initPingPong();
-      }
-      this.initServer();
-      this.emit('started');
-    }else{
-      throw new Error('No host, port or server object for start.');
-    }
-  }
+		this.jwt = jwt;
+		this.credentials = credentials;
 
-  async stop(){
-    try{
-      this.setClosing();
-      await this.closeClientConnections();
-      await this.closeServer();
-    }catch(e){
-      this.logError(e);
-    }
-  }
+		this.getRouter = getRouter;
+		this.getMessenger = getMessenger;
 
-  initServer(){
-    this.wsServer.on('error', this.onError.bind(this));
-    this.wsServer.on('connection', this.onConnection.bind(this));
-  }
+		this.intPingPong = null;
+		return this;
+	}
 
-  onError(err){
-    this.logError(`ws server error: `, err);
-    this.emit('wsError', err);
-  }
+	start(){
+		let opts = {};
+		if(this.connection.server){
+			opts.server = this.connection.server;
+		}
+		if(!isNaN(this.connection.port) && this.connection.port){
+			opts.port = this.connection.port;
+		}
+		if(this.connection.host){
+			opts.host = this.connection.host;
+		}
+		if(opts.host || opts.port || opts.server){
+			this.wsServer = new ws.Server(opts);
+			if(this.connection.ping){
+				this.initPingPong();
+			}
+			this.initServer();
+			this.emit('started');
+		}else{
+			throw new Error('No host, port or server object for start.');
+		}
+	}
 
-  isSecure(){
-    return !!this.options.secure;
-  }
+	async stop(){
+		try{
+			this.setClosing();
+			await this.closeClientConnections();
+			await this.closeServer();
+		}catch(e){
+			this.logError(e);
+		}
+	}
 
-  connectionIsNotSecure(conn, req){
-    //Пропускаем уже отключенные токены.
-    if((!conn) || (conn.readyState !== conn.OPEN)){
-      return false;
-    }
-    let token = url.parse(req.url, true).query.token;
-    //Проверяем токен
-    try {
-      this.logMsg('token', token);
-      let decoded  =  jwt.verify(token, this.options.jwt.key);
-      this.logMsg('decoded token', decoded);
-      return !decoded.active;
-    } catch(err) {
-      this.logDebug(err);
-      if(err.name === 'TokenExpiredError'){
-        this.logError('Client must update token');
-      }
-      return true;
-    }
-  }
+	initServer(){
+		this.wsServer.on('error', this.onError.bind(this));
+		this.wsServer.on('connection', this.onConnection.bind(this));
+	}
 
-  getClientIdentity(req){
-    if(this.isSecure()){
-      let token = url.parse(req.url, true).query.token;
-      return jwt.verify(token, this.options.jwt.key);
-    }else{
-      return false;
-    }
-  }
+	onError(err){
+		this.logError(`ws server error: `, err);
+		this.emit('wsError', err);
+	}
 
-  onConnection(connection, req){
-    if(this.isSecure()){
-      this.logMsg('Secure server');
-      if(this.connectionIsNotSecure(connection, req)){
-        this.informClientAboutExperiedToken(connection, req)
+	isSecure(){
+		return !!this.connection.secure;
+	}
+
+	connectionIsNotSecure(conn, req){
+		//Пропускаем уже отключенные токены.
+		if((!conn) || (conn.readyState !== conn.OPEN)){
+			return false;
+		}
+		let token = url.parse(req.url, true).query.token;
+		//Проверяем токен
+		try {
+			this.logMsg('token', token);
+			let decoded  =  jwt.verify(token, this.jwt.key);
+			this.logMsg('decoded token', decoded);
+			return !decoded.active;
+		} catch(err) {
+			this.logDebug(err);
+			if(err.name === 'TokenExpiredError'){
+				this.logError('Client must update token');
+			}
+			return true;
+		}
+	}
+
+	getClientIdentity(req){
+		if(this.isSecure()){
+			let token = url.parse(req.url, true).query.token;
+			return jwt.verify(token, this.jwt.key);
+		}else{
+			return false;
+		}
+	}
+
+	onConnection(connection, req){
+		if(this.isSecure()){
+			this.logMsg('Secure server');
+			if(this.connectionIsNotSecure(connection, req)){
+				this.informClientAboutExperiedToken(connection, req)
 					.then(()=>{
 						connection.close();
 					})
 					.catch(this.logError.bind(this));
 				this.logError( new Error(`Connection from ${req.socket.remoteAddress}/${req.url} refused, as not secure`));
 				return;
-      }
-    }
-    let wsConn = new notWSClient({
-      identity:     this.getClientIdentity(req),
-      slave:        true,
-      connection:{
-        ping:         false,
-        ws:           connection,
-        state:        'online',
-        ip:           req.socket.remoteAddress,
-      },
-      credentials:  Object.assign({}, this.options.credentials),
-      messenger:    this.getMessengerForClient(connection, req),
-      router:       this.getRouterForClient(connection, req)
-    });
-    this.emit('connection', wsConn, req);
-    wsConn.connection.once('errored', this.terminateAndRemoveWSClient.bind(this));
-    if(Object.prototype.hasOwnProperty.call(this.options,'events') &&
-      Object.prototype.hasOwnProperty.call(this.options.events,'onmessage' &&
-      Func.isFunc(this.options.events.onmessage)
-      )){
-        wsConn.on('message', this.options.events.onmessage);
-    }
-    this.wsClients.push(wsConn);
-    this.logMsg(`New client from ${req.socket.remoteAddress}`);
-    this.lastCount = this.wsClients.length;
-    this.emit('clientsCountChanged', this.wsClients.length);
-  }
+			}
+		}
+		let wsConn = new notWSClient({
+			identity:     this.getClientIdentity(req),
+			slave:        true,
+			connection:{
+				ping:         false,
+				ws:           connection,
+				ip:           req.socket.remoteAddress,
+			},
+			credentials:  Object.assign({}, this.credentials),
+			messenger:    this.getMessengerForClient(connection, req),
+			router:       this.getRouterForClient(connection, req)
+		});
+		this.emit('connection', wsConn, req);
+		wsConn.connection.once('errored', this.terminateAndRemoveWSClient.bind(this));
+		wsConn.on('message', this.onClientMessage.bind(this));
+		this.wsClients.push(wsConn);
+		this.logMsg(`New client from ${req.socket.remoteAddress}`);
+		this.lastCount = this.wsClients.length;
+		this.emit('clientsCountChanged', this.wsClients.length);
+	}
 
-  getMessengerForClient(conn, req){
-    if(Func.isFunc(this.options.getMessenger)){
-      return this.options.getMessenger(conn, req);
-    }else{
-      return new notWSMessage();
-    }
-  }
+	onClientMessage(){
+		this.emit('clientMessage', ...arguments);
+	}
 
-  getRouterForClient(conn, req){
-    if(Func.isFunc(this.options.getRouter)){
-      return this.options.getRouter(conn, req);
-    }else{
-      return this.clientRouter;
-    }
-  }
+	getMessengerForClient(conn, req){
+		if(Func.isFunc(this.getMessenger)){
+			return this.getMessenger(conn, req);
+		}
+	}
 
-  setClosing(){
-    this.isClosing = true;
-  }
+	getRouterForClient(conn, req){
+		if(Func.isFunc(this.getRouter)){
+			return this.getRouter(conn, req);
+		}
+	}
 
-  closeServer(){
-    return new Promise((res, rej)=>{
-      try{
-        this.wsServer.close((e)=>{
-          if(e){
-            rej(e);
-          }else{
-            res();
-          }
-        });
-      }catch(e){
-        rej(e);
-      }
-    });
-  }
+	setClosing(){
+		this.isClosing = true;
+	}
 
-  closeClientConnections(){
-    while(this.wsClients.length){
-      if(this.wsClients[0].isConnected()){
-        this.terminateAndRemoveWSClient(this.wsClients[0]);
-      }else{
-        this.removeClient(this.wsClients[0]);
-      }
-    }
-  }
+	closeServer(){
+		return new Promise((res, rej)=>{
+			try{
+				this.wsServer.close((e)=>{
+					if(e){
+						rej(e);
+					}else{
+						res();
+					}
+				});
+			}catch(e){
+				rej(e);
+			}
+		});
+	}
 
-  terminateAndRemoveWSClient(wsc){
-    if (wsc){
-      if(Object.prototype.hasOwnProperty.call(this.options,'events') &&
-        Object.prototype.hasOwnProperty.call(this.options.events,'onmessage' &&
-        Func.isFunc(this.options.events.onmessage)
-        )){
-          wsc.removeListener('message', this.options.events.onmessage);
-      }
-      wsc.terminate();
-      this.removeClient(wsc);
-    }
-  }
+	closeClientConnections(){
+		while(this.wsClients.length){
+			if(this.wsClients[0].isConnected()){
+				this.terminateAndRemoveWSClient(this.wsClients[0]);
+			}else{
+				this.removeClient(this.wsClients[0]);
+			}
+		}
+	}
 
-  removeClient(wsc){
-    if(this.wsClients.indexOf(wsc) > -1){
-      this.wsClients.splice(this.wsClients.indexOf(wsc), 1);
-    }
-  }
+	terminateAndRemoveWSClient(wsc){
+		if (wsc){
+			wsc.terminate();
+			wsc.destroy();
+			this.removeClient(wsc);
+		}
+	}
 
-  findAndRemoveDeadClients(){
-    let dead =[];
-    for(let client of this.wsClients){
-      if(client.isDead()){
-        dead.push(client);
-      }
-    }
-    dead.forEach(this.removeClient.bind(this));
-    if(this.lastCount !== this.wsClients.length) {
-      this.lastCount = this.wsClients.length;
-      this.emit('clientsCountChanged', this.wsClients.length);
-    }
-  }
+	removeClient(wsc){
+		if(this.wsClients.indexOf(wsc) > -1){
+			this.wsClients.splice(this.wsClients.indexOf(wsc), 1);
+		}
+	}
 
-  initPingPong(){
+	findAndRemoveDeadClients(){
+		let dead =[];
+		for(let client of this.wsClients){
+			if(client.isDead()){
+				dead.push(client);
+			}
+		}
+		dead.forEach(this.removeClient.bind(this));
+		if(this.lastCount !== this.wsClients.length) {
+			this.lastCount = this.wsClients.length;
+			this.emit('clientsCountChanged', this.wsClients.length);
+		}
+	}
+
+	initPingPong(){
 		if(this.intPingPong){
 			clearInterval(this.intPingPong);
 		}
@@ -262,83 +263,81 @@ class notWSServer extends EventEmitter{
 	}
 
 	pingAll(){
-		//this.logDebug('Ping all clients');
 		this.wsClients.forEach(this.pingOne.bind(this));
-    this.findAndRemoveDeadClients();
+		this.findAndRemoveDeadClients();
 	}
 
 	pingOne(client){
-		//this.logDebug(`ping client`, client.ip);
 		client.ping();
 	}
 
-  informClientAboutExperiedToken(conn, req){
-    return new Promise((res, rej)=>{
-    try{
-      let msg = {
-        type:'__service',
-        name: 'updateToken'
-      };
-      conn.send(JSON.stringify(this.getMessengerForClient(conn, req).pack({}, msg)),
-        (e)=>{
-          if(e){rej(e);}
-          else{res();}
-        });
-    }catch(e){
-      rej(e);
-    }
-    });
-  }
+	informClientAboutExperiedToken(conn, req){
+		return new Promise((res, rej)=>{
+			try{
+				let msg = {
+					type:'__service',
+					name: 'updateToken'
+				};
+				conn.send(JSON.stringify(this.getMessengerForClient(conn, req).pack({}, msg)),
+					(e)=>{
+						if(e){rej(e);}
+						else{res();}
+					});
+			}catch(e){
+				rej(e);
+			}
+		});
+	}
 
-  /**
+	/**
   * Broadcasting message to clients
   * @param {string} type  type of the message
   * @param {string} name  name of the message
   * @param {object} payload data to be transmitted
   * @secure {boolean} secure
   */
-  broadcast(type, name, payload, secure = true, connFilter = undefined){
-    this.getClients(connFilter).forEach((client)=>{
-      client.send(type, name, payload, secure);
-    });
-  }
+	broadcast(type, name, payload, secure = true, connFilter = undefined){
+		this.getClients(connFilter).forEach((client)=>{
+			client.send(type, name, payload, secure);
+		});
+	}
 
-  /**
+	/**
   * filtering clients by specified function and return resulting array
   * @param {function} filter function to filter clients
   * @returns {Array}
   */
-  getClients(filter){
-    if(Func.isFunc(filter)){
-      return this.wsClients.filter(filter);
-    }else{
-      return this.wsClients;
-    }
-  }
+	getClients(filter){
+		if(Func.isFunc(filter)){
+			return this.wsClients.filter(filter);
+		}else{
+			return this.wsClients;
+		}
+	}
 
-  /**
+	/**
   * filtering clients by specified function and return first passing test
   * @param {function} test function to test clients and found required
   * @returns {notWSServerClient}
   */
-  getClient({test, _id}){
-    if(!Func.isFunc(test) && _id){
-      test = (client)=>{
-        if(client.identity){
-          if(client.identity && client.identity._id){
-            return client.identity._id.toString() === _id.toString();
-          }
-        }
-        return false;
-      }
-    }
-    for(let t in this.wsClients){
-      if(test(this.wsClients[t])){
-        return this.wsClients[t];
-      }
-    }
-    return false;
-  }
+	getClient({test, _id}){
+		if(!Func.isFunc(test) && _id){
+			test = (client)=>{
+				if(client.identity){
+					if(client.identity && client.identity._id){
+						return client.identity._id.toString() === _id.toString();
+					}
+				}
+				return false;
+			};
+		}
+		for(let t in this.wsClients){
+			if(test(this.wsClients[t])){
+				return this.wsClients[t];
+			}
+		}
+		return false;
+	}
 
 }
 module.exports = notWSServer;
