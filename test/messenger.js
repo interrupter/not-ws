@@ -1,5 +1,5 @@
 const
-  uuidv4 = require('uuid/v4'),
+  uuid = require('uuid'),
   expect = require('chai').expect,
   notWSMessage = require('../src/node/messenger.js');
 
@@ -37,7 +37,7 @@ describe('notWSMessage', () => {
   it('getting service data from message', () => {
     let msg = new notWSMessage(),
       message = {
-        id: uuidv4(),
+        id: uuid.v4(),
         time: (new Date()).getTime(),
         type: 'request',
         name: 'auth',
@@ -56,7 +56,7 @@ describe('notWSMessage', () => {
   it('getting type', () => {
     let msg = new notWSMessage(),
       message = {
-        id: uuidv4(),
+        id: uuid.v4(),
         time: (new Date()).getTime(),
         type: 'request',
         name: 'loath',
@@ -69,7 +69,7 @@ describe('notWSMessage', () => {
   it('getting name', () => {
     let msg = new notWSMessage(),
       message = {
-        id: uuidv4(),
+        id: uuid.v4(),
         time: (new Date()).getTime(),
         type: 'request',
         name: 'loath',
@@ -82,7 +82,7 @@ describe('notWSMessage', () => {
   it('getting credentials', () => {
     let msg = new notWSMessage(),
       message = {
-        id: uuidv4(),
+        id: uuid.v4(),
         time: (new Date()).getTime(),
         type: 'request',
         name: 'loath',
@@ -102,7 +102,7 @@ describe('notWSMessage', () => {
   it('getting payload', () => {
     let msg = new notWSMessage(),
       message = {
-        id: uuidv4(),
+        id: uuid.v4(),
         time: (new Date()).getTime(),
         type: 'request',
         name: 'loath',
@@ -124,7 +124,7 @@ describe('notWSMessage', () => {
   it('isErrored - false', () => {
     let msg = new notWSMessage(),
       message = {
-        id: uuidv4(),
+        id: uuid.v4(),
         time: (new Date()).getTime(),
         type: 'request',
         name: 'loath',
@@ -144,7 +144,7 @@ describe('notWSMessage', () => {
   it('isErrored - true', () => {
     let msg = new notWSMessage(),
       message = {
-        id: uuidv4(),
+        id: uuid.v4(),
         time: (new Date()).getTime(),
         type: 'request',
         name: 'loath',
@@ -165,7 +165,7 @@ describe('notWSMessage', () => {
   it('getErrorMessage from string error', () => {
     let msg = new notWSMessage(),
       message = {
-        id: uuidv4(),
+        id: uuid.v4(),
         time: (new Date()).getTime(),
         type: 'request',
         name: 'loath',
@@ -186,7 +186,7 @@ describe('notWSMessage', () => {
   it('getErrorMessage from error object', () => {
     let msg = new notWSMessage(),
       message = {
-        id: uuidv4(),
+        id: uuid.v4(),
         time: (new Date()).getTime(),
         type: 'request',
         name: 'loath',
@@ -210,7 +210,7 @@ describe('notWSMessage', () => {
   it('getErrorMessage from undefined error', () => {
     let msg = new notWSMessage(),
       message = {
-        id: uuidv4(),
+        id: uuid.v4(),
         time: (new Date()).getTime(),
         type: 'request',
         name: 'loath',
@@ -232,7 +232,7 @@ describe('notWSMessage', () => {
   it('getErrorReport from error object', () => {
     let msg = new notWSMessage(),
       message = {
-        id: uuidv4(),
+        id: uuid.v4(),
         time: (new Date()).getTime(),
         type: 'request',
         name: 'loath',
@@ -639,7 +639,7 @@ describe('notWSMessage', () => {
         securityException: ['method.open']
       }),
       message = {
-				id: uuidv4(),
+				id: uuid.v4(),
         payload: {
           foo: 'bar'
         }
@@ -660,7 +660,7 @@ describe('notWSMessage', () => {
         securityException: ['method.open']
       }),
       message = {
-				id: uuidv4(),
+				id: uuid.v4(),
         type: 'method',
         name: 'open',
         payload: {
@@ -686,7 +686,7 @@ describe('notWSMessage', () => {
         }
       }),
       message = {
-				id: uuidv4(),
+				id: uuid.v4(),
         type: 'method',
         name: 'open',
         payload: {
@@ -712,7 +712,7 @@ describe('notWSMessage', () => {
         }
       }),
       message = {
-				id: uuidv4(),
+				id: uuid.v4(),
         type: 'method',
         name: 'open',
         payload: {

@@ -1,9 +1,8 @@
 
-import validator from 'validator';
 import EventEmitter from 'wolfy87-eventemitter';
 import CONST from './const.js';
 import Func from './func.js';
-import uuidv4 from 'uuid/v4';
+import * as uuid from 'uuid';
 
 /**
  * set of default options
@@ -117,7 +116,7 @@ class notWSMessenger extends EventEmitter {
 			throw new Error('No Service Data for packing notWSMsg');
 		}
 		let msg = {
-			id: uuidv4(),
+			id: uuid.v4(),
 			time: (new Date()).getTime(),
 			payload,
 		};
@@ -174,7 +173,7 @@ class notWSMessenger extends EventEmitter {
 
 	validate(msg) {
 		let serviceData = this.getServiceData(msg);
-		if (!validator.isUUID(serviceData.id, 4)) {
+		if (!uuid.validate(serviceData.id)) {
 			throw new Error(CONST.ERR_MSG.MSG_ID_IS_NOT_VALID);
 		}
 		if (

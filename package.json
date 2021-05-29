@@ -1,6 +1,6 @@
 {
   "name": "not-ws",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "not-* family module for WebSocket communication",
   "main": "index.js",
   "scripts": {
@@ -32,8 +32,7 @@
   "dependencies": {
     "jsonwebtoken": "*",
     "url": "*",
-    "uuid": "*",
-    "validator": "*",
+    "uuid": "^8.3.2",
     "wolfy87-eventemitter": "*",
     "ws": "*"
   },
@@ -50,11 +49,11 @@
     "mocha": "*",
     "nyc": "*",
     "rollup": "*",
-    "rollup-plugin-commonjs": "*",
-    "rollup-plugin-node-resolve": "*",
     "rollup-plugin-babel": "*",
+    "rollup-plugin-commonjs": "*",
     "rollup-plugin-eslint": "*",
     "rollup-plugin-filesize": "*",
+    "rollup-plugin-node-resolve": "*",
     "rollup-plugin-terser": "*"
   },
   "nyc": {
