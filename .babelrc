@@ -1,12 +1,12 @@
 {
   "presets": [
-    "env",
-    "react",
-    "stage-0"
+    "env"
   ],
   "plugins": [
     "transform-class-properties",
-    "transform-decorators",
+    ["@babel/plugin-proposal-decorators", {
+     "decoratorsBeforeExport": false
+   }],
     "transform-react-constant-elements",
     "transform-react-inline-elements"
   ]

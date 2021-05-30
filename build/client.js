@@ -1195,6 +1195,10 @@ var notWSClient = (function () {
 	    this.bindSocketEvents(); //message history
 
 	    this.history = [];
+	    this.passed = {
+	      in: 0,
+	      out: 0
+	    };
 	    return this;
 	  }
 
@@ -1204,7 +1208,9 @@ var notWSClient = (function () {
 	      activity: CONST.ACTIVITY_NAME[this[SYMBOL_ACTIVITY$1]],
 	      isAlive: this.isAlive(),
 	      isTerminated: this.isTerminated,
-	      isReconnecting: this.isReconnecting
+	      isReconnecting: this.isReconnecting,
+	      in: this.passed.in,
+	      out: this.paased.out
 	    };
 	  }
 
@@ -1376,7 +1382,8 @@ var notWSClient = (function () {
 
 	  onMessage(input) {
 	    try {
-	      //проверяем не "понг" ли это, если так - выходим
+	      this.countPassed(input, 'in'); //проверяем не "понг" ли это, если так - выходим
+
 	      let rawMsg = input.data;
 
 	      if (this.checkPingMsg(rawMsg)) {
@@ -1567,7 +1574,7 @@ var notWSClient = (function () {
 
 	  pong() {
 	    if (this.isOpen()) {
-	      this.ws.send('pong');
+	      this.wsSend('pong');
 	      this.emit('pong');
 	    }
 	  }
@@ -1578,7 +1585,7 @@ var notWSClient = (function () {
 
 	  ping() {
 	    if (this.isOpen()) {
-	      this.ws.send('ping');
+	      this.wsSend('ping').catch(Func.noop);
 	      this.emit('ping');
 	    }
 	  }
@@ -1614,30 +1621,20 @@ var notWSClient = (function () {
 	  */
 
 
-	  send(data, secure) {
+	  async send(data, secure) {
 	    //Проверяем что клиент подключен
-	    return new Promise((resolve, reject) => {
-	      try {
-	        if (this.isConnected(secure) || this.isOpen() && this.isMessageTokenUpdateRequest(data)) {
-	          //Пытаемся отправить сообщение клиенту.
-	          this.ws.send(JSON.stringify(data), err => {
-	            if (err) {
-	              this.state = CONST.STATE.ERRORED;
-	              reject(err);
-	            } else {
-	              resolve();
-	            }
-	          });
-	        } else {
-	          this.emit('messageNotSent', CONST.STATE_NAME[this.state]);
-	          this.addToHistory(data);
-	          resolve();
-	        }
-	      } catch (e) {
-	        this.state = CONST.STATE.ERRORED;
-	        reject(e);
+	    try {
+	      if (this.isConnected(secure) || this.isOpen() && this.isMessageTokenUpdateRequest(data)) {
+	        //Пытаемся отправить сообщение клиенту.
+	        await this.wsSend(JSON.stringify(data));
+	      } else {
+	        this.emit('messageNotSent', CONST.STATE_NAME[this.state]);
+	        this.addToHistory(data);
 	      }
-	    });
+	    } catch (e) {
+	      this.state = CONST.STATE.ERRORED;
+	      throw e;
+	    }
 	  }
 
 	  addToHistory(data) {
@@ -1764,8 +1761,6 @@ var notWSClient = (function () {
 	          this.disconnectTimeout = setTimeout(this.disconnect.bind(this), 100);
 	          break;
 	      }
-
-	      return true;
 	    } else {
 	      throw new Error('set: Unknown notWSServerClient state: ' + state);
 	    }
@@ -1834,11 +1829,26 @@ var notWSClient = (function () {
 	          this.emit('terminating', this);
 	          break;
 	      }
-
-	      return true;
 	    } else {
 	      throw new Error('set: Unknown notWSServerClient activity: ' + activity);
 	    }
+	  }
+
+	  wsSend(msg) {
+	    return new Promise((res, rej) => {
+	      this.ws.send(this.countPassed(msg, 'out'), err => {
+	        if (err) {
+	          rej(err);
+	        } else {
+	          res();
+	        }
+	      });
+	    });
+	  }
+
+	  countPassed(input, where) {
+	    this.passed[where] += Buffer.byteLength(input, 'utf8');
+	    return input;
 	  }
 
 	  destroy() {
@@ -1867,8 +1877,8 @@ var notWSClient = (function () {
 	*         {boolean}           reconnect       - reconnect if disconnected
 	*         {boolean}           ping            - ping server to indentify connection problems ASAP
 	* @params {function}        getToken          - should return token for auth on server
-	* @params {notWSMessenger}  messenger         - message handler
-	* @params {notWSRouter}     router            - request handler
+	* @params {notWSMessenger}  messenger         - message handler or its config
+	* @params {notWSRouter}     router            - request handler or its config
 	* @params {object}          logger            - log interface {function:log, function:debug, function:error}
 	* @params {boolean}         slave             - true - this is server child connection for remote client, false - it is connection to another server
 	* @params {Array<string>}   debug             - list of features to debug and show more information
@@ -2011,7 +2021,7 @@ var notWSClient = (function () {
 	          //если нужна аутентификация
 	          if (this.connection.isSecure()) {
 	            //получаем и сохраняем токен токен
-	            this.saveToken((await this.getToken()));
+	            this.saveToken(await this.getToken());
 	          } //подключаемся
 
 

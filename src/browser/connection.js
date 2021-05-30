@@ -55,6 +55,10 @@ class notWSConnection extends EventEmitter{
 		this.bindSocketEvents();
 		//message history
 		this.history = [];
+		this.passed = {
+			in:  0,
+			out: 0,
+		};
 		return this;
 	}
 
@@ -65,6 +69,8 @@ class notWSConnection extends EventEmitter{
 			isAlive:        this.isAlive(),
 			isTerminated:   this.isTerminated,
 			isReconnecting: this.isReconnecting,
+			in:             this.passed.in,
+			out:            this.paased.out,
 		};
 	}
 
@@ -233,6 +239,7 @@ class notWSConnection extends EventEmitter{
 	//msg - это messageEvent пришедший по WS, соответственно данные лежат в msg.data.
 	onMessage(input){
 		try{
+			this.countPassed(input, 'in');
 			//проверяем не "понг" ли это, если так - выходим
       
 			let rawMsg = input.data;
@@ -410,7 +417,7 @@ class notWSConnection extends EventEmitter{
 
 	pong(){
 		if(this.isOpen()){
-			this.ws.send('pong');
+			this.wsSend('pong');
 			this.emit('pong');
 		}
 	}
@@ -421,7 +428,7 @@ class notWSConnection extends EventEmitter{
 	ping(){
 		if(this.isOpen()){
       
-			this.ws.send('ping');
+			this.wsSend('ping').catch(Func.noop);
       
 			this.emit('ping');
 		}
@@ -456,30 +463,20 @@ class notWSConnection extends EventEmitter{
   *                         - объекта, будут переданы без изменений
   * @return {Promise} resolve - удачно, reject - сбой
   */
-	send(data, secure) {
+	async send(data, secure) {
 		//Проверяем что клиент подключен
-		return new Promise((resolve, reject) => {
-			try {
-				if (this.isConnected(secure) || (this.isOpen() && this.isMessageTokenUpdateRequest(data))) {
-					//Пытаемся отправить сообщение клиенту.
-					this.ws.send(JSON.stringify(data), (err) => {
-						if (err) {
-							this.state = CONST.STATE.ERRORED;
-							reject(err);
-						} else {
-							resolve();
-						}
-					});
-				} else {
-					this.emit('messageNotSent', CONST.STATE_NAME[this.state]);
-					this.addToHistory(data);
-					resolve();
-				}
-			} catch (e) {
-				this.state = CONST.STATE.ERRORED;
-				reject(e);
+		try {
+			if (this.isConnected(secure) || (this.isOpen() && this.isMessageTokenUpdateRequest(data))) {
+				//Пытаемся отправить сообщение клиенту.
+				await this.wsSend(JSON.stringify(data));
+			} else {
+				this.emit('messageNotSent', CONST.STATE_NAME[this.state]);
+				this.addToHistory(data);
 			}
-		});
+		} catch (e) {
+			this.state = CONST.STATE.ERRORED;
+			throw e;
+		}
 	}
 
 	addToHistory(data) {
@@ -600,7 +597,6 @@ class notWSConnection extends EventEmitter{
 				this.disconnectTimeout = setTimeout(this.disconnect.bind(this), 100);
 				break;
 			}
-			return true;
 		} else {
 			throw new Error('set: Unknown notWSServerClient state: ' + state);
 		}
@@ -655,10 +651,27 @@ AUTHORIZING: 4
 			case CONST.ACTIVITY.CLOSING:      this.emit('closing', this); break;
 			case CONST.ACTIVITY.TERMINATING:  this.emit('terminating', this); break;
 			}
-			return true;
 		} else {
 			throw new Error('set: Unknown notWSServerClient activity: ' + activity);
 		}
+	}
+
+	wsSend(msg){
+		return new Promise((res, rej)=>{
+			this.ws.send(this.countPassed(msg, 'out'), (err)=>{
+				if(err){
+					rej(err);
+				}else{
+					res();
+				}
+			});
+		});
+
+	}
+
+	countPassed(input, where){
+		this.passed[where] += Buffer.byteLength(input, 'utf8');
+		return input;
 	}
 
 	destroy(){

@@ -20,8 +20,8 @@
 *         {boolean}           reconnect       - reconnect if disconnected
 *         {boolean}           ping            - ping server to indentify connection problems ASAP
 * @params {function}        getToken          - should return token for auth on server
-* @params {notWSMessenger}  messenger         - message handler
-* @params {notWSRouter}     router            - request handler
+* @params {notWSMessenger}  messenger         - message handler or its config
+* @params {notWSRouter}     router            - request handler or its config
 * @params {object}          logger            - log interface {function:log, function:debug, function:error}
 * @params {boolean}         slave             - true - this is server child connection for remote client, false - it is connection to another server
 * @params {Array<string>}   debug             - list of features to debug and show more information

@@ -30,6 +30,7 @@
   },
   "homepage": "https://github.com/interrupter/not-ws#readme",
   "dependencies": {
+    "deepmerge": "^4.2.2",
     "jsonwebtoken": "*",
     "url": "*",
     "uuid": "^8.3.2",
@@ -37,12 +38,14 @@
     "ws": "*"
   },
   "devDependencies": {
-    "@babel/core": "*",
+    "@babel/core": "^7.14.3",
+    "@babel/eslint-parser": "^7.14.4",
+    "@babel/plugin-proposal-decorators": "^7.14.2",
     "babel-env": "*",
     "babel-polyfill": "*",
     "chai": "*",
     "ejs": "*",
-    "eslint": "*",
+    "eslint": "^7.27.0",
     "express": "*",
     "ink-docstrap": "*",
     "jsdoc": "*",

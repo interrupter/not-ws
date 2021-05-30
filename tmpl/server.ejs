@@ -28,8 +28,10 @@ class notWSServer extends EventEmitter{
   *  connection.interface -   relay interface
   *  jwt                  -   JWT token options
   *  jwt.key              -   JWT key
-  *  getRouter            -   getter/factory for client router function(conn, req)
-  *  getMessenger         -   getter/factory for client messenger function(conn, req)
+  *  routes               -   collection of routes on server, that will be passed to getRouter
+  *  getRouter            -   getter/factory for client router function(conn, req, routes)
+  *  messenger            -   messenger options, that will be passed to getMessenger
+  *  getMessenger         -   getter/factory for client messenger function(conn, req, messenger)
   *  credentials          -   creds
   **/
 
@@ -58,7 +60,7 @@ class notWSServer extends EventEmitter{
 
     this.routes = routes;
     this.messenger = messenger;
-    
+
     this.wsServer   = null;
     this.isClosing   = false;
     this.wsClients  = [];
@@ -192,12 +194,16 @@ class notWSServer extends EventEmitter{
   getMessengerForClient(conn, req){
     if(Func.isFunc(this.getMessenger)){
       return this.getMessenger(conn, req, this.messenger);
+    }else{
+      this.messenger;
     }
   }
 
   getRouterForClient(conn, req){
     if(Func.isFunc(this.getRouter)){
       return this.getRouter(conn, req, this.routes);
+    }else{
+      this.routes;
     }
   }
 
