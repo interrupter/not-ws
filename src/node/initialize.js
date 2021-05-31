@@ -47,10 +47,10 @@ class initializer{
 			this.collectWSEndPoints(mod);
 		});
 		//expose Clients and Servers
-		this.exposeWS();
+		this.exposeWS(notApp);
 	}
 
-	collectWSEndPoints(mod) {
+	static collectWSEndPoints(mod) {
 		if(mod.getEndPoints){
 			let eps = mod.getEndPoints();
 			if (eps) {
@@ -74,11 +74,11 @@ class initializer{
 		}
 	}
 
-	getWSEndPointServerName(endPoint){
+	static getWSEndPointServerName(endPoint){
 		return Object.prototype.hasOwnProperty.call(endPoint, 'serverName')?endPoint.serverName:DEFAULT_WS_SERVER_NAME;
 	}
 
-	addWSAction(
+	static addWSAction(
 		collectionType,
 		collectionName,
 		messageType,
@@ -92,11 +92,11 @@ class initializer{
 		);
 	}
 
-	hasWSEndPoints(owner) {
+	static hasWSEndPoints(owner) {
 		return Object.keys(owner).length;
 	}
 
-	exposeWS(notApp) {
+	static exposeWS(notApp) {
 		//include only in case
 		try {
 			log.log('WS', this.FINAL_CONFIG);
@@ -124,7 +124,7 @@ class initializer{
 		}
 	}
 
-	initWSServer(serverName = DEFAULT_WS_SERVER_NAME, opts, notApp) {
+	static initWSServer(serverName = DEFAULT_WS_SERVER_NAME, opts, notApp) {
 		log.info(`Starting WSServer(${serverName})...`);
 		try {
 			if(!opts){
@@ -134,7 +134,7 @@ class initializer{
 			const WSServer = new notWSServer(
 				{
 					...opts,
-					routes: this.getWSRoutes(name, 'servers')
+					routes: this.getWSRoutes(serverName, 'servers')
 				}
 			);
 			notApp.addWSServer(serverName, WSServer);
@@ -146,7 +146,7 @@ class initializer{
 		}
 	}
 
-	initWSClient(clientName, opts, notApp) {
+	static initWSClient(clientName, opts, notApp) {
 		log.info(`Starting WSClient(${clientName})...`);
 		try {
 			if(!opts){
@@ -161,7 +161,7 @@ class initializer{
 		}
 	}
 
-	getWSClientOptions(name, opts){
+	static getWSClientOptions(name, opts){
 		let res = {
 			name
 		};
@@ -176,7 +176,7 @@ class initializer{
 		return Object.assign(res, opts);
 	}
 
-	getWSRoutes(name, whose){
+	static getWSRoutes(name, whose){
 		if(Object.prototype.hasOwnProperty.call(this.ROUTES[whose], name)){
 			return this.ROUTES[whose][name];
 		}else{

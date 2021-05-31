@@ -45,11 +45,11 @@ class notWSServer extends EventEmitter{
       credentials,
       logger
     }){
-    if(!Func.isFunc(getRouter)){
-      throw new Error('getRouter is not function');
+    if(!Func.isFunc(getRouter) && !routes){
+      throw new Error('getRouter is not function and routes is not set');
     }
-    if(!Func.isFunc(getMessenger)){
-      throw new Error('getMessenger is not function');
+    if(!Func.isFunc(getMessenger) && !messenger){
+      throw new Error('getMessenger is not function and messenger is not set');
     }
     super();
     this.connection = Object.assign({}, DEFAULT_CONNECTION, connection);
@@ -195,7 +195,7 @@ class notWSServer extends EventEmitter{
     if(Func.isFunc(this.getMessenger)){
       return this.getMessenger(conn, req, this.messenger);
     }else{
-      this.messenger;
+      return this.messenger;
     }
   }
 
@@ -203,7 +203,7 @@ class notWSServer extends EventEmitter{
     if(Func.isFunc(this.getRouter)){
       return this.getRouter(conn, req, this.routes);
     }else{
-      this.routes;
+      return {routes: this.routes};
     }
   }
 
