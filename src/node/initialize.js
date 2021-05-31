@@ -99,12 +99,10 @@ class initializer{
 	static exposeWS(notApp) {
 		//include only in case
 		try {
-			log.log('WS', this.FINAL_CONFIG);
 			if(typeof this.FINAL_CONFIG !== 'undefined'){
 				if (this.hasWSEndPoints(this.ROUTES.servers)){
 					if(Object.prototype.hasOwnProperty.call(this.FINAL_CONFIG, 'servers')){
 						for(let serverName in this.FINAL_CONFIG.servers){
-							log.log(serverName, this.FINAL_CONFIG.servers[serverName]);
 							this.initWSServer(serverName, this.FINAL_CONFIG.servers[serverName], notApp);
 						}
 					}
@@ -128,7 +126,6 @@ class initializer{
 		log.info(`Starting WSServer(${serverName})...`);
 		try {
 			if(!opts){
-				log.log(opts);
 				throw new Error(`No WS server(${serverName}) options`);
 			}
 			const WSServer = new notWSServer(
@@ -154,9 +151,9 @@ class initializer{
 			}
 			const WSClient = new notWSClient(this.getWSClientOptions(clientName, opts));
 			notApp.addWSClient(clientName, WSClient);
-			log.info(`WS server(${clientName}) connected to `+ opts.connection.host+ ':' + opts.connection.port);
+			log.info(`WS client(${clientName}) connected to `+ opts.connection.host+ ':' + opts.connection.port);
 		} catch (e) {
-			log.error(`WS server(${clientName}) startup failure`);
+			log.error(`WS client(${clientName}) startup failure`);
 			log.error(e);
 		}
 	}
