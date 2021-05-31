@@ -14,7 +14,8 @@ const MAX_HISTORY_DEPTH = 40;
 const DEFAULT_OPTIONS = {
 	secure:     true,
 	reconnect:  true,
-	ping:       true
+	ping:       true,
+	count:      true,
 };
 
 class notWSConnection extends EventEmitter{
@@ -670,8 +671,14 @@ AUTHORIZING: 4
 	}
 
 	countPassed(input, where){
-		this.passed[where] += Buffer.byteLength(input, 'utf8');
+		this.passed[where] += this.options.count?this.getMessageSize(input):0;
 		return input;
+	}
+
+	getMessageSize(input){
+    
+		return new Blob([input]).size;
+    
 	}
 
 	destroy(){
