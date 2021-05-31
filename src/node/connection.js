@@ -103,9 +103,7 @@ class notWSConnection extends EventEmitter{
 			this.ws.on('close', this.listeners.close);
 			this.ws.on('error', this.listeners.error);
 			this.ws.on('pong', this.onPong.bind(this));
-			this.ws.on('ping', ()=>{
-				console.log('ping ev');
-			});
+			this.ws.on('ping', this.onPing.bind(this));
     
 		}
 	}
@@ -469,6 +467,12 @@ class notWSConnection extends EventEmitter{
 	onPong(){
 		this.setAlive();
 		this.emit('ponged');
+	}
+
+	onPing(){
+		this.setAlive();
+		this.emit('pinged');
+		this.pong();
 	}
   
 
