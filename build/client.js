@@ -2254,13 +2254,13 @@ var notWSClient = (function () {
 	  }
 
 	  routeEvent(msg) {
-	    this.router.route(msg.service, msg.payload, this.connection.getSocket()).catch(e => {
+	    this.router.route(msg.service, msg.payload, this.connection).catch(e => {
 	      this.logError(e);
 	    });
 	  }
 
 	  routeCommon(msg) {
-	    this.router.route(msg.service, msg.payload, this.connection.getSocket()).catch(e => {
+	    this.router.route(msg.service, msg.payload, this.connection).catch(e => {
 	      this.logError(e);
 	      this.respond({}, {
 	        id: msg.service.id,
@@ -2271,7 +2271,7 @@ var notWSClient = (function () {
 	  }
 
 	  routeRequest(msg) {
-	    this.router.route(msg.service, msg.payload, this.connection.getSocket()).then(responseData => {
+	    this.router.route(msg.service, msg.payload, this.connection).then(responseData => {
 	      this.respond(responseData, {
 	        id: msg.service.id,
 	        type: CONST.MSG_TYPE.RESPONSE,
