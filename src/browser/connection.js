@@ -80,7 +80,7 @@ class notWSConnection extends EventEmitter{
 	}
 
 	getIP(){
-		if(this.isOpen()){
+		if(this.isOpen() && this.ws._socket && this.ws._socket.remoteAddress){
 			return this.ws._socket.remoteAddress;
 		}else{
 			return false;

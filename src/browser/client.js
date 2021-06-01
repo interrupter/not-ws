@@ -100,7 +100,6 @@ class notWSClient extends EventEmitter{
 		return this.connection?this.connection.getIP():false;
 	}
 
-
 	initConnection(connection){
 		this.connection = new notWSConnection(connection);
 		this.connection.on('disconnected', ()=>{
@@ -364,14 +363,14 @@ class notWSClient extends EventEmitter{
 	}
 
 	routeEvent(msg){
-		this.router.route(msg.service, msg.payload, this.connection)
+		this.router.route(msg.service, msg.payload, this)
 			.catch((e)=>{
 				this.logError(e);
 			});
 	}
 
 	routeCommon(msg){
-		this.router.route(msg.service, msg.payload, this.connection)
+		this.router.route(msg.service, msg.payload, this)
 			.catch((e)=>{
 				this.logError(e);
 				this.respond({}, {id: msg.service.id, type: CONST.MSG_TYPE.RESPONSE, name: msg.service.name}, e);
@@ -379,7 +378,7 @@ class notWSClient extends EventEmitter{
 	}
 
 	routeRequest(msg){
-		this.router.route(msg.service, msg.payload, this.connection)
+		this.router.route(msg.service, msg.payload, this)
 			.then((responseData)=>{
 				this.respond(responseData, {id: msg.service.id, type: CONST.MSG_TYPE.RESPONSE, name: msg.service.name});
 			})

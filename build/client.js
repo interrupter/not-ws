@@ -716,7 +716,7 @@ var notWSClient = (function () {
 	                      name - action name
 	                      cred - some credentials info
 	    @params {object}  data  payload information from message
-	    @params {object}  conn  WS Connection
+	    @params {object}  client  WS Connection
 	    @returns  {Promise} from targeted action or throwing Error if route doesn't exist
 	  */
 
@@ -725,13 +725,13 @@ var notWSClient = (function () {
 	    type,
 	    name,
 	    cred
-	  }, data, conn) {
+	  }, data, client) {
 	    if (Func.ObjHas(this.routes, type) && Func.ObjHas(this.routes[type], name)) {
-	      this.logMsg('ip:', conn._socket ? conn._socket.remoteAddress : 'no ip info', type, name);
+	      this.logMsg('ip:', client.getIP(), type, name);
 	      return this.routes[type][name]({
 	        data,
 	        cred,
-	        conn
+	        client
 	      });
 	    }
 
@@ -1220,7 +1220,7 @@ var notWSClient = (function () {
 	  }
 
 	  getIP() {
-	    if (this.isOpen()) {
+	    if (this.isOpen() && this.ws._socket && this.ws._socket.remoteAddress) {
 	      return this.ws._socket.remoteAddress;
 	    } else {
 	      return false;
@@ -2254,13 +2254,13 @@ var notWSClient = (function () {
 	  }
 
 	  routeEvent(msg) {
-	    this.router.route(msg.service, msg.payload, this.connection).catch(e => {
+	    this.router.route(msg.service, msg.payload, this).catch(e => {
 	      this.logError(e);
 	    });
 	  }
 
 	  routeCommon(msg) {
-	    this.router.route(msg.service, msg.payload, this.connection).catch(e => {
+	    this.router.route(msg.service, msg.payload, this).catch(e => {
 	      this.logError(e);
 	      this.respond({}, {
 	        id: msg.service.id,
@@ -2271,7 +2271,7 @@ var notWSClient = (function () {
 	  }
 
 	  routeRequest(msg) {
-	    this.router.route(msg.service, msg.payload, this.connection).then(responseData => {
+	    this.router.route(msg.service, msg.payload, this).then(responseData => {
 	      this.respond(responseData, {
 	        id: msg.service.id,
 	        type: CONST.MSG_TYPE.RESPONSE,

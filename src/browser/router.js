@@ -53,16 +53,16 @@ class notWSRouter extends EventEmitter{
                       name - action name
                       cred - some credentials info
     @params {object}  data  payload information from message
-    @params {object}  conn  WS Connection
+    @params {object}  client  WS Connection
     @returns  {Promise} from targeted action or throwing Error if route doesn't exist
   */
-	route({type, name, cred}, data, conn){
+	route({type, name, cred}, data, client){
 		if(
 			Func.ObjHas(this.routes, type) &&
       Func.ObjHas(this.routes[type], name)
 		){
-			this.logMsg('ip:', conn._socket?conn._socket.remoteAddress:'no ip info', type, name);
-			return this.routes[type][name]({data, cred, conn});
+			this.logMsg('ip:', client.getIP(), type, name);
+			return this.routes[type][name]({data, cred, client});
 		}
 		throw (new Error(`Route not found ${type}/${name}`));
 	}

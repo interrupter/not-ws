@@ -82,7 +82,7 @@ describe('notWSRouter', () => {
         }
       },
       router = new notWSRouter({routes});
-      let t = router.route({type: 'method', name: 'man', cred: null}, {}, {ip: '127.0.0.1'});
+      let t = router.route({type: 'method', name: 'man', cred: null}, {}, {ip: '127.0.0.1', getIP(){return '127.0.0.1';}});
       expect(t).to.instanceof(Promise);
   });
 
