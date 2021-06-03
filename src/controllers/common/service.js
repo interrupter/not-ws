@@ -32,9 +32,9 @@ class nsWS {
 				options.connection = Object.assign(options.connection, {...optionsFromAppConfig});
 			}
 			let client = new notWSClient(options);
-			client.once('ready', this.app.emit.bind(this, `wsClient:${name}:ready`, client));
-			client.on('connected', this.app.emit.bind(this, `wsClient:${name}:connected`, client));
-			client.on('diconnected', this.app.emit.bind(this, `wsClient:${name}:diconnected`, client));
+			client.once('ready', this.app.emit.bind(this.app, `wsClient:${name}:ready`, client));
+			client.on('connected', this.app.emit.bind(this.app, `wsClient:${name}:connected`, client));
+			client.on('diconnected', this.app.emit.bind(this.app, `wsClient:${name}:diconnected`, client));
 			this.app.setWSClient(name, client);
 		}catch(e){
 			this.app.error(e);
