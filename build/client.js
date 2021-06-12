@@ -1981,12 +1981,14 @@ var notWSClient = (function () {
 	      this.logMsg('disconnected');
 	      this.stopReqChckTimer();
 	      this.emit('close', this);
+	      this.emit('disconnected', this);
 	    });
 	    this.connection.on('connected', () => {
 	      this.logMsg('connected'); //Запускаем таймер проверки списка запросов.
 
 	      this.startReqChckTimer();
 	      this.emit('open', this);
+	      this.emit('connected', this);
 	    });
 	    this.connection.on('connectURI', e => {
 	      this.logMsg('connectURI', e);
