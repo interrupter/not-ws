@@ -142,9 +142,9 @@ class notWSMessenger extends EventEmitter {
     };
   }
 
-  validateCredentials(credentials = {}) {
+  validateCredentials(credentials = {}, serviceData) {
     if (this.options.validators && this.options.validators.credentials) {
-      return this.options.validators.credentials(credentials);
+      return this.options.validators.credentials(credentials, serviceData);
     }
     return !this.options.secure;
   }
