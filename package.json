@@ -1,6 +1,6 @@
 {
   "name": "not-ws",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "not-* family module for WebSocket communication",
   "main": "index.js",
   "scripts": {
@@ -32,6 +32,7 @@
   "dependencies": {
     "deepmerge": "^4.2.2",
     "jsonwebtoken": "*",
+    "not-error": "^0.0.60",
     "url": "*",
     "uuid": "^8.3.2",
     "wolfy87-eventemitter": "*",

@@ -177,33 +177,44 @@ class notWSMessenger extends EventEmitter {
       throw new Error(CONST.ERR_MSG.MSG_ID_IS_NOT_VALID);
     }
     if (
-    //если не в списке исключений
+      //если не в списке исключений
       !this.routeIsSecurityException(serviceData.type, serviceData.name) &&
       //проверяем права доступа
-      !this.validateCredentials(this.getCredentials(msg))
+      !this.validateCredentials(this.getCredentials(msg), serviceData)
     ) {
       throw new Error(CONST.ERR_MSG.MSG_CREDENTIALS_IS_NOT_VALID);
     }
-    if(this.options.validateType){
-      if (!this.validateType(this.getType(msg))) {
-        let err = new Error(CONST.ERR_MSG.MSG_TYPE_IS_NOT_VALID);
-        err.details = {
-          type: this.getType(msg)
-        };
-        throw err;
-      }
-    }
-    if(this.options.validateTypeAndName){
-      if (!this.validateTypeAndName(this.getType(msg), this.getName(msg))) {
-        let err = new Error(CONST.ERR_MSG.MSG_NAME_IS_NOT_VALID);
-        err.details = {
-          type: this.getType(msg),
-          name: this.getName(msg)
-        };
-        throw err;
-      }
-    }
+    //not neccessary, but
+    this.validateRouteTypeAndName(msg);
     return msg;
+  }
+
+  validateRouteTypeAndName(msg){
+    //default: false
+    if(this.options.validateTypeAndName){
+      this.validateRouteType(msg);
+      let type = this.getType(msg),
+        name = this.getName(msg);
+      if (!this.validateTypeAndName(type, name)) {
+        let err = new Error(CONST.ERR_MSG.MSG_NAME_IS_NOT_VALID);
+        err.details = {type,name};
+        throw err;
+      }
+    }else{
+      this.validateRouteType(msg);
+    }
+  }
+
+  validateRouteType(msg){
+    let type = this.getType(msg);
+    //default: true
+    if(this.options.validateType){
+      if (!this.validateType(type)) {
+        let err = new Error(CONST.ERR_MSG.MSG_TYPE_IS_NOT_VALID);
+        err.details = {type};
+        throw err;
+      }
+    }
   }
 
   enableRoute(route, name){

@@ -132,9 +132,8 @@ class notWSServer extends EventEmitter{
     //Проверяем токен
     try {
       this.logMsg('token', token);
-      let decoded  =  jwt.verify(token, this.jwt.key);
-      this.logMsg('decoded token', decoded);
-      return !decoded.active;
+      jwt.verify(token, this.jwt.key);
+      return false;
     } catch(err) {
       this.logDebug(err);
       if(err.name === 'TokenExpiredError'){
@@ -155,14 +154,14 @@ class notWSServer extends EventEmitter{
 
   onConnection(connection, req){
     if(this.isSecure()){
-      this.logMsg('Secure server');
+      //this.logMsg('Secure server');
       if(this.connectionIsNotSecure(connection, req)){
         this.informClientAboutExperiedToken(connection, req)
 					.then(()=>{
 						connection.close();
 					})
 					.catch(this.logError.bind(this));
-				this.logError( new Error(`Connection from ${req.socket.remoteAddress}/${req.url} refused, as not secure`));
+				this.logMsg(`Connection from ${req.socket.remoteAddress} refused, as not secure`);
 				return;
       }
     }
