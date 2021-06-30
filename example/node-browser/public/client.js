@@ -2224,6 +2224,10 @@ var notWSClient = (function () {
 	    }
 	  }
 
+	  clearToken() {
+	    this.saveToken(undefined);
+	  }
+
 	  ping() {
 	    this.connection.sendPing();
 	  }

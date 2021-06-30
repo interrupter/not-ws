@@ -365,6 +365,10 @@ class notWSClient extends EventEmitter{
     }
   }
 
+  clearToken(){
+    this.saveToken(undefined);
+  }
+
   ping(){
     this.connection.sendPing();
   }
