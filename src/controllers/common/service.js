@@ -11,6 +11,7 @@ class nsWS {
 		for(let client in clients){
 			this.initClient(client, clients[client]);
 		}
+		this.app.on('user.logout', this.clearMainToken.bind(this));
 	}
 
 	initClient(name, opts){
@@ -38,6 +39,13 @@ class nsWS {
 			this.app.setWSClient(name, client);
 		}catch(e){
 			this.app.error(e);
+		}
+	}
+
+	clearMainToken(){
+		const client = this.app.getWSClient('main');
+		if(client){
+			client.clearToken();
 		}
 	}
 
