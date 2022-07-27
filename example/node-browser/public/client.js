@@ -621,6 +621,33 @@ var notWSClient = (function () {
 	function isFunc(func) {
 	  return typeof func === 'function';
 	}
+	/**
+	 * Returns true if argument is Async function
+	 * @param {function} func  to test
+	 * @return {boolean}       if this function is constructed as AsyncFunction
+	 **/
+
+
+	function isAsync(func) {
+	  return func.constructor.name === "AsyncFunction";
+	}
+	/**
+	 *  Executes method in appropriate way inside Promise
+	 * @param {function}   proc    function to execute
+	 * @param {Array}     params  array of params
+	 * @return {Promise}          results of method execution
+	 **/
+
+	async function executeFunctionAsAsync(proc, params) {
+	  if (isFunc(proc)) {
+	    if (isAsync(proc)) {
+	      return await proc(...params);
+	    } else {
+	      return proc(...params);
+	    }
+	  } //throw new Error("Could not execute `proc` is not a function");
+
+	}
 
 	function noop() {}
 
@@ -662,6 +689,8 @@ var notWSClient = (function () {
 
 	var Func = {
 	  isFunc,
+	  isAsync,
+	  executeFunctionAsAsync,
 	  isArray,
 	  noop,
 	  heartbeat,
@@ -730,18 +759,35 @@ var notWSClient = (function () {
 	  */
 
 
-	  route({
+	  async route({
 	    type,
 	    name,
 	    cred
 	  }, data, client) {
 	    if (Func.ObjHas(this.routes, type) && Func.ObjHas(this.routes[type], name)) {
 	      this.logMsg('ip:', client.getIP(), type, name);
-	      return this.routes[type][name]({
-	        data,
-	        cred,
-	        client
-	      });
+
+	      if (Array.isArray(this.routes[type][name]) && this.routes[type][name].length > 1) {
+	        const len = this.routes[type][name].length;
+	        const guards = this.routes[type][name].slice(0, len - 1);
+	        const actualRoute = this.routes[type][name][len - 1];
+	        await Promise.all(guards.map(guard => Func.executeFunctionAsAsync(guard, [{
+	          data,
+	          cred,
+	          client
+	        }])));
+	        return Func.executeFunctionAsAsync(actualRoute, [{
+	          data,
+	          cred,
+	          client
+	        }]);
+	      } else if (Func.isFunc(this.routes[type][name])) {
+	        return await Func.executeFunctionAsAsync(this.routes[type][name], [{
+	          data,
+	          cred,
+	          client
+	        }]);
+	      }
 	    }
 
 	    throw new CONST.notWSException(`Route not found ${type}/${name}`);

@@ -3,6 +3,32 @@ function isFunc(func){
 	return typeof(func) === 'function';
 }
 
+/**
+ * Returns true if argument is Async function
+ * @param {function} func  to test
+ * @return {boolean}       if this function is constructed as AsyncFunction
+ **/
+function isAsync(func){
+	return func.constructor.name === "AsyncFunction";
+}
+
+/**
+ *  Executes method in appropriate way inside Promise
+ * @param {function}   proc    function to execute
+ * @param {Array}     params  array of params
+ * @return {Promise}          results of method execution
+ **/
+async function executeFunctionAsAsync (proc, params){
+	if (isFunc(proc)) {
+		if (isAsync(proc)) {
+			return await proc(...params);
+		} else {
+			return proc(...params);
+		}
+	}
+	//throw new Error("Could not execute `proc` is not a function");
+}
+
 function noop() {}
 function heartbeat() { this._alive = true;}
 
@@ -40,6 +66,8 @@ let capitalizeFirstLetter = function(name){
 
 export default {
 	isFunc,
+	isAsync,
+	executeFunctionAsAsync,
 	isArray,
 	noop,
 	heartbeat,
