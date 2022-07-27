@@ -104,6 +104,12 @@ const MSG_TYPE = {
 
 const DEV_ENV = 'development';
 
+class notWSException extends Error{
+	constructor(){
+		super(...arguments);
+	}
+}
+
 
 
 let [, hash] = location.hash.split('#');
@@ -132,6 +138,7 @@ export default {
 	MSG_TYPE,
 	TOKEN_TTL,
 	TOKEN_RENEW_TTL,
+	notWSException
 };
 
 

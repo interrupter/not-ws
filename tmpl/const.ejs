@@ -104,6 +104,12 @@ const MSG_TYPE = {
 
 const DEV_ENV = 'development';
 
+class notWSException extends Error{
+  constructor(){
+    super(...arguments);
+  }
+}
+
 <% if (env === 'node'){ %>
   const ENV_TYPE = process.env.NODE_ENV;
 
@@ -130,6 +136,7 @@ const DEV_ENV = 'development';
     TOKEN_RENEW_TTL,
     ENV_TYPE,
     DEV_ENV,
+    notWSException,
   };
 <% }else{ %>
 
@@ -159,6 +166,7 @@ export default {
     MSG_TYPE,
     TOKEN_TTL,
     TOKEN_RENEW_TTL,
+    notWSException
   };
 
 <% } %>

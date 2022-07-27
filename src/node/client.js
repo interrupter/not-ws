@@ -50,13 +50,13 @@ class notWSClient extends EventEmitter{
     debug = []
   }){
     if(!router){
-      throw new Error('Router is not set or is not instance of notWSRouter');
+      throw new CONST.notWSException('Router is not set or is not instance of notWSRouter');
     }
     if(!(router instanceof notWSRouter)){
       router = new notWSRouter(router);
     }
     if(!messenger){
-      throw new Error('Messenger is not set or is not instance of notWSMessenger');
+      throw new CONST.notWSException('Messenger is not set or is not instance of notWSMessenger');
     }
     if (!(messenger instanceof notWSMessenger)){
       messenger = new notWSMessenger(messenger);

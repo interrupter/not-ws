@@ -1,6 +1,6 @@
 {
   "name": "not-ws",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "description": "not-* family module for WebSocket communication",
   "main": "index.js",
   "scripts": {
@@ -32,21 +32,21 @@
   "dependencies": {
     "deepmerge": "^4.2.2",
     "jsonwebtoken": "*",
-    "not-error": "^0.0.60",
+    "not-error": "^0.2.5",
     "url": "*",
     "uuid": "^8.3.2",
     "wolfy87-eventemitter": "*",
     "ws": "*"
   },
   "devDependencies": {
-    "@babel/core": "^7.14.3",
-    "@babel/eslint-parser": "^7.14.4",
-    "@babel/plugin-proposal-decorators": "^7.14.2",
+    "@babel/core": "^7.18.9",
+    "@babel/eslint-parser": "^7.18.9",
+    "@babel/plugin-proposal-decorators": "^7.18.9",
     "babel-env": "*",
     "babel-polyfill": "*",
     "chai": "*",
     "ejs": "*",
-    "eslint": "^7.27.0",
+    "eslint": "^8.20.0",
     "express": "*",
     "ink-docstrap": "*",
     "jsdoc": "*",

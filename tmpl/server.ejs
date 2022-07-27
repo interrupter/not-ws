@@ -46,10 +46,10 @@ class notWSServer extends EventEmitter{
       logger
     }){
     if(!Func.isFunc(getRouter) && !routes){
-      throw new Error('getRouter is not function and routes is not set');
+      throw new CONST.notWSException('getRouter is not function and routes is not set');
     }
     if(!Func.isFunc(getMessenger) && !messenger){
-      throw new Error('getMessenger is not function and messenger is not set');
+      throw new CONST.notWSException('getMessenger is not function and messenger is not set');
     }
     super();
     this.connection = Object.assign({}, DEFAULT_CONNECTION, connection);
@@ -95,7 +95,7 @@ class notWSServer extends EventEmitter{
       this.initServer();
       this.emit('started');
     }else{
-      throw new Error('No host, port or server object for start.');
+      throw new CONST.notWSException('No host, port or server object for start.');
     }
   }
 

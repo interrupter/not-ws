@@ -72,7 +72,7 @@ class notWSConnection extends EventEmitter{
       isTerminated:   this.isTerminated,
       isReconnecting: this.isReconnecting,
       in:             this.passed.in,
-      out:            this.paased.out,
+      out:            this.passed.out,
     };
   }
 
@@ -256,7 +256,7 @@ class notWSConnection extends EventEmitter{
       let data = Func.tryParseJSON(rawMsg);
       //Не удалось распарсить ответ от сервера как JSON
       if(!data){
-        this.emit('messageInWronFormat', rawMsg);
+        this.emit('messageInWrongFormat', rawMsg);
         return;
       }
       this.emit('message', data);
@@ -535,7 +535,7 @@ class notWSConnection extends EventEmitter{
           this[SYMBOL_STATE] = state;
           this.activity = CONST.ACTIVITY.IDLE;
         } else {
-          throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
+          throw new CONST.notWSException('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
         }
         break;
         //можем повиснуть, авторизоваться вылететь с ошибкой
@@ -550,7 +550,7 @@ class notWSConnection extends EventEmitter{
           this[SYMBOL_STATE] = state;
           this.activity = CONST.ACTIVITY.IDLE;
         } else {
-          throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
+          throw new CONST.notWSException('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
         }
         break;
         //можем потерять авторизацию, но продолжить висеть на линии
@@ -567,7 +567,7 @@ class notWSConnection extends EventEmitter{
           this[SYMBOL_STATE] = state;
           this.activity = CONST.ACTIVITY.IDLE;
         } else {
-          throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
+          throw new CONST.notWSException('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
         }
         break;
         ////из остояний разрыва связи, можно уйти только в "не подключен"
@@ -577,7 +577,7 @@ class notWSConnection extends EventEmitter{
           this[SYMBOL_STATE] = state;
           this.activity = CONST.ACTIVITY.IDLE;
         } else {
-          throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
+          throw new CONST.notWSException('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
         }
         break;
         //можем только отключиться
@@ -589,7 +589,7 @@ class notWSConnection extends EventEmitter{
           this[SYMBOL_STATE] = state;
           this.activity = CONST.ACTIVITY.IDLE;
         } else {
-          throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
+          throw new CONST.notWSException('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE]] + ' -> ' + CONST.STATE_NAME[state]);
         }
         break;
       }
@@ -618,7 +618,7 @@ class notWSConnection extends EventEmitter{
           break;
       }
     } else {
-      throw new Error('set: Unknown notWSServerClient state: ' + state);
+      throw new CONST.notWSException('set: Unknown notWSServerClient state: ' + state);
     }
   }
 
@@ -672,7 +672,7 @@ AUTHORIZING: 4
         case CONST.ACTIVITY.TERMINATING:  this.emit('terminating', this); break;
       }
     } else {
-      throw new Error('set: Unknown notWSServerClient activity: ' + activity);
+      throw new CONST.notWSException('set: Unknown notWSServerClient activity: ' + activity);
     }
   }
 

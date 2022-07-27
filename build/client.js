@@ -581,6 +581,14 @@ var notWSClient = (function () {
 	  COMMAND: 'command'
 	};
 	const DEV_ENV = 'development';
+
+	class notWSException extends Error {
+	  constructor() {
+	    super(...arguments);
+	  }
+
+	}
+
 	let [, hash] = location.hash.split('#');
 	const ENV_TYPE = hash;
 	var CONST = {
@@ -605,7 +613,8 @@ var notWSClient = (function () {
 	  TIME_OFFSET_REQUEST_INTERVAL,
 	  MSG_TYPE,
 	  TOKEN_TTL,
-	  TOKEN_RENEW_TTL
+	  TOKEN_RENEW_TTL,
+	  notWSException
 	};
 
 	//Проверка является ли переменная функцией.
@@ -735,7 +744,7 @@ var notWSClient = (function () {
 	      });
 	    }
 
-	    throw new Error(`Route not found ${type}/${name}`);
+	    throw new CONST.notWSException(`Route not found ${type}/${name}`);
 	  }
 	  /**
 	  * Adding routes, chainable
@@ -779,7 +788,7 @@ var notWSClient = (function () {
 
 	  validateType(type) {
 	    if (typeof type !== 'string' || type === '') {
-	      throw new Error('Route\'s type name should be a String!');
+	      throw new CONST.notWSException('Route\'s type name should be a String!');
 	    }
 
 	    return true;
@@ -787,7 +796,7 @@ var notWSClient = (function () {
 
 	  validateRoutes(routes) {
 	    if (typeof routes !== 'object' || routes === null || routes === undefined) {
-	      throw new Error('Route\'s type\'s routes set should be an Object!');
+	      throw new CONST.notWSException('Route\'s type\'s routes set should be an Object!');
 	    }
 
 	    return true;
@@ -795,7 +804,7 @@ var notWSClient = (function () {
 
 	  validateRoutesList(list) {
 	    if (!Array.isArray(list) || typeof list === 'undefined') {
-	      throw new Error('List of routes names should be an Array!');
+	      throw new CONST.notWSException('List of routes names should be an Array!');
 	    }
 
 	    return true;
@@ -906,7 +915,15 @@ var notWSClient = (function () {
 	    'typeOfMessage': ['list', 'of', 'name\'s', 'of', 'actions'],
 	    'test': ['sayHello'],
 	    '__service': ['updateToken']
-	  }
+	  },
+	  wrap: {
+	    ok: undefined,
+	    error: undefined
+	  },
+	  isErrored: undefined,
+	  //override rule of defining unpacked message as failed (msg):void
+	  markMessageAsErrored: undefined //override rule of marking message as errored (msg, serviceData, error):void
+
 	};
 	/***
 	message format for this default adaptor
@@ -917,7 +934,7 @@ var notWSClient = (function () {
 	  payload:{} <- payload
 	  cred:any
 	  time:int
-	  error:{} <- if errored
+	  error:{} <- if errored on communitaction level, errors from other levels could be transported in payload
 
 	}
 	*/
@@ -931,7 +948,9 @@ var notWSClient = (function () {
 	class notWSMessenger extends EventEmitter {
 	  constructor(options = {}) {
 	    super();
-	    this.options = Object.assign({}, DEFAULT_OPTIONS, options);
+	    this.options = { ...DEFAULT_OPTIONS,
+	      ...options
+	    };
 
 	    if (Func.ObjHas(this.options.types, CONST.MSG_TYPE.REQUEST) && !Func.ObjHas(this.options.types, CONST.MSG_TYPE.RESPONSE)) {
 	      this.options.types[CONST.MSG_TYPE.RESPONSE] = this.options.types[CONST.MSG_TYPE.REQUEST];
@@ -975,7 +994,21 @@ var notWSClient = (function () {
 	  }
 
 	  isErrored(msg) {
-	    return typeof msg.error !== 'undefined' && msg.error !== null;
+	    if (Func.isFunc(this.options.isErrored)) {
+	      return this.options.isErrored(msg);
+	    } else {
+	      return typeof msg.error !== 'undefined' && msg.error !== null;
+	    }
+	  }
+
+	  markMessageAsErrored(msg, serviceData, error) {
+	    if (Func.isFunc(this.options.markMessageAsErrored)) {
+	      this.options.markMessageAsErrored(msg, serviceData, error);
+	    } else {
+	      if (error instanceof CONST.notWSException) {
+	        msg.error = error;
+	      }
+	    }
 	  }
 
 	  getErrorMessage(msg) {
@@ -984,7 +1017,7 @@ var notWSClient = (function () {
 	    } else if (typeof msg.error === 'object') {
 	      return `${msg.error.code}: ${msg.error.message}`;
 	    } else {
-	      throw new Error('No error data in message');
+	      throw new CONST.notWSException('No error data in message');
 	    }
 	  }
 
@@ -998,30 +1031,44 @@ var notWSClient = (function () {
 
 
 	  pack(payload, serviceData, error) {
-	    if (typeof serviceData === 'undefined' || serviceData === null) {
-	      throw new Error('No Service Data for packing notWSMsg');
+	    if (!error && typeof serviceData === 'undefined' || serviceData === null) {
+	      throw new CONST.notWSException('No Service Data or Error for packing notWSMsg');
 	    }
 
+	    const payloadWrapped = this.wrapPayload(payload, serviceData, error);
 	    let msg = {
 	      id: v4(),
 	      time: new Date().getTime(),
-	      payload
+	      payload: payloadWrapped
 	    };
 
 	    if (this.options.credentials) {
 	      msg.cred = this.options.credentials;
 	    }
 
-	    if (error) {
-	      msg['error'] = error;
-	    }
-
+	    this.markMessageAsErrored(msg, serviceData, error);
 	    return Object.assign(msg, serviceData);
+	  }
+
+	  wrapPayload(payload, serviceData, error) {
+	    if (error && error instanceof Error) {
+	      return this.wrapPayloadAs('error', payload, serviceData, error);
+	    } else {
+	      return this.wrapPayloadAs('ok', payload, serviceData, error);
+	    }
+	  }
+
+	  wrapPayloadAs(status, payload, serviceData, error) {
+	    if (typeof this.options.wrap === 'object' && Func.isFunc(this.options.wrap[status])) {
+	      return this.options.wrap[status](payload, serviceData, error);
+	    } else {
+	      return payload;
+	    }
 	  }
 
 	  unpack(msg) {
 	    if (this.isErrored(msg)) {
-	      let err = new Error(this.getErrorMessage(msg));
+	      let err = new CONST.notWSException(this.getErrorMessage(msg));
 	      err.report = this.getErrorReport(msg);
 	      throw err;
 	    }
@@ -1071,13 +1118,13 @@ var notWSClient = (function () {
 	    let serviceData = this.getServiceData(msg);
 
 	    if (!validate(serviceData.id)) {
-	      throw new Error(CONST.ERR_MSG.MSG_ID_IS_NOT_VALID);
+	      throw new CONST.notWSException(CONST.ERR_MSG.MSG_ID_IS_NOT_VALID);
 	    }
 
 	    if ( //если не в списке исключений
 	    !this.routeIsSecurityException(serviceData.type, serviceData.name) && //проверяем права доступа
 	    !this.validateCredentials(this.getCredentials(msg), serviceData)) {
-	      throw new Error(CONST.ERR_MSG.MSG_CREDENTIALS_IS_NOT_VALID);
+	      throw new CONST.notWSException(CONST.ERR_MSG.MSG_CREDENTIALS_IS_NOT_VALID);
 	    } //not neccessary, but
 
 
@@ -1093,7 +1140,7 @@ var notWSClient = (function () {
 	          name = this.getName(msg);
 
 	      if (!this.validateTypeAndName(type, name)) {
-	        let err = new Error(CONST.ERR_MSG.MSG_NAME_IS_NOT_VALID);
+	        let err = new CONST.notWSException(CONST.ERR_MSG.MSG_NAME_IS_NOT_VALID);
 	        err.details = {
 	          type,
 	          name
@@ -1110,7 +1157,7 @@ var notWSClient = (function () {
 
 	    if (this.options.validateType) {
 	      if (!this.validateType(type)) {
-	        let err = new Error(CONST.ERR_MSG.MSG_TYPE_IS_NOT_VALID);
+	        let err = new CONST.notWSException(CONST.ERR_MSG.MSG_TYPE_IS_NOT_VALID);
 	        err.details = {
 	          type
 	        };
@@ -1226,7 +1273,7 @@ var notWSClient = (function () {
 	      isTerminated: this.isTerminated,
 	      isReconnecting: this.isReconnecting,
 	      in: this.passed.in,
-	      out: this.paased.out
+	      out: this.passed.out
 	    };
 	  }
 
@@ -1409,7 +1456,7 @@ var notWSClient = (function () {
 	      let data = Func.tryParseJSON(rawMsg); //Не удалось распарсить ответ от сервера как JSON
 
 	      if (!data) {
-	        this.emit('messageInWronFormat', rawMsg);
+	        this.emit('messageInWrongFormat', rawMsg);
 	        return;
 	      }
 
@@ -1690,7 +1737,7 @@ var notWSClient = (function () {
 	            this[SYMBOL_STATE$1] = state;
 	            this.activity = CONST.ACTIVITY.IDLE;
 	          } else {
-	            throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE$1]] + ' -> ' + CONST.STATE_NAME[state]);
+	            throw new CONST.notWSException('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE$1]] + ' -> ' + CONST.STATE_NAME[state]);
 	          }
 
 	          break;
@@ -1701,7 +1748,7 @@ var notWSClient = (function () {
 	            this[SYMBOL_STATE$1] = state;
 	            this.activity = CONST.ACTIVITY.IDLE;
 	          } else {
-	            throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE$1]] + ' -> ' + CONST.STATE_NAME[state]);
+	            throw new CONST.notWSException('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE$1]] + ' -> ' + CONST.STATE_NAME[state]);
 	          }
 
 	          break;
@@ -1714,7 +1761,7 @@ var notWSClient = (function () {
 	            this[SYMBOL_STATE$1] = state;
 	            this.activity = CONST.ACTIVITY.IDLE;
 	          } else {
-	            throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE$1]] + ' -> ' + CONST.STATE_NAME[state]);
+	            throw new CONST.notWSException('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE$1]] + ' -> ' + CONST.STATE_NAME[state]);
 	          }
 
 	          break;
@@ -1726,7 +1773,7 @@ var notWSClient = (function () {
 	            this[SYMBOL_STATE$1] = state;
 	            this.activity = CONST.ACTIVITY.IDLE;
 	          } else {
-	            throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE$1]] + ' -> ' + CONST.STATE_NAME[state]);
+	            throw new CONST.notWSException('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE$1]] + ' -> ' + CONST.STATE_NAME[state]);
 	          }
 
 	          break;
@@ -1737,7 +1784,7 @@ var notWSClient = (function () {
 	            this[SYMBOL_STATE$1] = state;
 	            this.activity = CONST.ACTIVITY.IDLE;
 	          } else {
-	            throw new Error('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE$1]] + ' -> ' + CONST.STATE_NAME[state]);
+	            throw new CONST.notWSException('Wrong state transition: ' + CONST.STATE_NAME[this[SYMBOL_STATE$1]] + ' -> ' + CONST.STATE_NAME[state]);
 	          }
 
 	          break;
@@ -1778,7 +1825,7 @@ var notWSClient = (function () {
 	          break;
 	      }
 	    } else {
-	      throw new Error('set: Unknown notWSServerClient state: ' + state);
+	      throw new CONST.notWSException('set: Unknown notWSServerClient state: ' + state);
 	    }
 	  }
 
@@ -1846,7 +1893,7 @@ var notWSClient = (function () {
 	          break;
 	      }
 	    } else {
-	      throw new Error('set: Unknown notWSServerClient activity: ' + activity);
+	      throw new CONST.notWSException('set: Unknown notWSServerClient activity: ' + activity);
 	    }
 	  }
 
@@ -1921,7 +1968,7 @@ var notWSClient = (function () {
 	    debug = []
 	  }) {
 	    if (!router) {
-	      throw new Error('Router is not set or is not instance of notWSRouter');
+	      throw new CONST.notWSException('Router is not set or is not instance of notWSRouter');
 	    }
 
 	    if (!(router instanceof notWSRouter)) {
@@ -1929,7 +1976,7 @@ var notWSClient = (function () {
 	    }
 
 	    if (!messenger) {
-	      throw new Error('Messenger is not set or is not instance of notWSMessenger');
+	      throw new CONST.notWSException('Messenger is not set or is not instance of notWSMessenger');
 	    }
 
 	    if (!(messenger instanceof notWSMessenger)) {

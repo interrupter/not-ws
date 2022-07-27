@@ -23,7 +23,13 @@ const DEFAULT_OPTIONS = {
 		'typeOfMessage':  ['list', 'of', 'name\'s', 'of', 'actions'],
 		'test': ['sayHello'],
 		'__service': ['updateToken'],
-	}
+	},
+	wrap:{
+		ok: undefined,
+		error: undefined
+	},
+	isErrored: undefined,             //override rule of defining unpacked message as failed (msg):void
+	markMessageAsErrored: undefined   //override rule of marking message as errored (msg, serviceData, error):void
 };
 
 /***
@@ -35,7 +41,7 @@ message format for this default adaptor
   payload:{} <- payload
   cred:any
   time:int
-  error:{} <- if errored
+  error:{} <- if errored on communitaction level, errors from other levels could be transported in payload
 
 }
 */
@@ -48,7 +54,7 @@ message format for this default adaptor
 class notWSMessenger extends EventEmitter {
 	constructor(options = {}) {
 		super();
-		this.options = Object.assign({}, DEFAULT_OPTIONS, options);
+		this.options = {...DEFAULT_OPTIONS, ...options};
 		if(Func.ObjHas(this.options.types, CONST.MSG_TYPE.REQUEST) && !Func.ObjHas(this.options.types, CONST.MSG_TYPE.RESPONSE)){
 			this.options.types[CONST.MSG_TYPE.RESPONSE] = this.options.types[CONST.MSG_TYPE.REQUEST];
 		}
@@ -90,7 +96,21 @@ class notWSMessenger extends EventEmitter {
 	}
 
 	isErrored(msg) {
-		return (typeof msg.error !== 'undefined') && (msg.error !== null);
+		if(Func.isFunc(this.options.isErrored)){
+			return this.options.isErrored(msg);
+		}else{
+			return (typeof msg.error !== 'undefined') && (msg.error !== null);
+		}
+	}
+
+	markMessageAsErrored(msg, serviceData, error ){
+		if(Func.isFunc(this.options.markMessageAsErrored)){
+			this.options.markMessageAsErrored(msg, serviceData, error);
+		}else{
+			if (error instanceof CONST.notWSException) {
+				msg.error = error;
+			}
+		}
 	}
 
 	getErrorMessage(msg) {
@@ -99,7 +119,7 @@ class notWSMessenger extends EventEmitter {
 		} else if (typeof msg.error === 'object') {
 			return `${msg.error.code}: ${msg.error.message}`;
 		} else {
-			throw new Error('No error data in message');
+			throw new CONST.notWSException('No error data in message');
 		}
 	}
 
@@ -112,26 +132,41 @@ class notWSMessenger extends EventEmitter {
    *
    */
 	pack(payload, serviceData, error) {
-		if ((typeof serviceData === 'undefined') || (serviceData === null)) {
-			throw new Error('No Service Data for packing notWSMsg');
+		if (!error && (typeof serviceData === 'undefined') || (serviceData === null)) {
+			throw new CONST.notWSException('No Service Data or Error for packing notWSMsg');
 		}
+		const payloadWrapped = this.wrapPayload(payload, serviceData, error);
 		let msg = {
 			id: uuid.v4(),
 			time: (new Date()).getTime(),
-			payload,
-		};
+			payload: payloadWrapped,
+		};    
 		if (this.options.credentials) {
 			msg.cred = this.options.credentials;
 		}
-		if (error) {
-			msg['error'] = error;
-		}
+		this.markMessageAsErrored(msg, serviceData, error);
 		return Object.assign(msg, serviceData);
+	}
+
+	wrapPayload(payload, serviceData, error){
+		if((error && error instanceof Error)){
+			return this.wrapPayloadAs('error', payload, serviceData, error);
+		}else{
+			return this.wrapPayloadAs('ok', payload, serviceData, error);
+		}
+	}
+
+	wrapPayloadAs(status, payload, serviceData, error){
+		if(typeof this.options.wrap === 'object' && Func.isFunc(this.options.wrap[status])){
+			return this.options.wrap[status](payload, serviceData, error);
+		}else{
+			return payload;
+		}
 	}
 
 	unpack(msg) {
 		if (this.isErrored(msg)) {
-			let err = new Error(this.getErrorMessage(msg));
+			let err = new CONST.notWSException(this.getErrorMessage(msg));
 			err.report = this.getErrorReport(msg);
 			throw err;
 		}
@@ -174,7 +209,7 @@ class notWSMessenger extends EventEmitter {
 	validate(msg) {
 		let serviceData = this.getServiceData(msg);
 		if (!uuid.validate(serviceData.id)) {
-			throw new Error(CONST.ERR_MSG.MSG_ID_IS_NOT_VALID);
+			throw new CONST.notWSException(CONST.ERR_MSG.MSG_ID_IS_NOT_VALID);
 		}
 		if (
 		//если не в списке исключений
@@ -182,7 +217,7 @@ class notWSMessenger extends EventEmitter {
       //проверяем права доступа
       !this.validateCredentials(this.getCredentials(msg), serviceData)
 		) {
-			throw new Error(CONST.ERR_MSG.MSG_CREDENTIALS_IS_NOT_VALID);
+			throw new CONST.notWSException(CONST.ERR_MSG.MSG_CREDENTIALS_IS_NOT_VALID);
 		}
 		//not neccessary, but
 		this.validateRouteTypeAndName(msg);
@@ -196,7 +231,7 @@ class notWSMessenger extends EventEmitter {
 			let type = this.getType(msg),
 				name = this.getName(msg);
 			if (!this.validateTypeAndName(type, name)) {
-				let err = new Error(CONST.ERR_MSG.MSG_NAME_IS_NOT_VALID);
+				let err = new CONST.notWSException(CONST.ERR_MSG.MSG_NAME_IS_NOT_VALID);
 				err.details = {type,name};
 				throw err;
 			}
@@ -210,7 +245,7 @@ class notWSMessenger extends EventEmitter {
 		//default: true
 		if(this.options.validateType){
 			if (!this.validateType(type)) {
-				let err = new Error(CONST.ERR_MSG.MSG_TYPE_IS_NOT_VALID);
+				let err = new CONST.notWSException(CONST.ERR_MSG.MSG_TYPE_IS_NOT_VALID);
 				err.details = {type};
 				throw err;
 			}

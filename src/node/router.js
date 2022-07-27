@@ -1,6 +1,7 @@
 
 const EventEmitter = require('events');
 const Func = require('./func.js');
+const CONST = require('./const.js');
 
 
 /**
@@ -64,7 +65,7 @@ class notWSRouter extends EventEmitter{
       this.logMsg('ip:', client.getIP(), type, name);
       return this.routes[type][name]({data, cred, client});
     }
-    throw (new Error(`Route not found ${type}/${name}`));
+    throw (new CONST.notWSException(`Route not found ${type}/${name}`));
   }
 
   /**
@@ -102,21 +103,21 @@ class notWSRouter extends EventEmitter{
 
   validateType(type){
     if((typeof type !== 'string') || (type === '')){
-      throw new Error('Route\'s type name should be a String!');
+      throw new CONST.notWSException('Route\'s type name should be a String!');
     }
     return true;
   }
 
   validateRoutes(routes){
     if((typeof routes !== 'object') || (routes === null) || (routes === undefined)){
-      throw new Error('Route\'s type\'s routes set should be an Object!');
+      throw new CONST.notWSException('Route\'s type\'s routes set should be an Object!');
     }
     return true;
   }
 
   validateRoutesList(list){
     if(!Array.isArray(list) || (typeof list === 'undefined')){
-      throw new Error('List of routes names should be an Array!');
+      throw new CONST.notWSException('List of routes names should be an Array!');
     }
     return true;
   }
