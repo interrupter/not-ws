@@ -1394,6 +1394,10 @@ var notWSClient = (function () {
 
 	  async connect() {
 	    try {
+	      if (!this.jwtToken) {
+	        throw new Error('No JWT token');
+	      }
+
 	      if (this.ws && this.ws.readyState !== WebSocket.CLOSED) {
 	        this.disconnect();
 	      }

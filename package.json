@@ -1,6 +1,6 @@
 {
   "name": "not-ws",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "description": "not-* family module for WebSocket communication",
   "main": "index.js",
   "scripts": {
@@ -36,7 +36,8 @@
     "url": "*",
     "uuid": "^8.3.2",
     "wolfy87-eventemitter": "*",
-    "ws": "*"
+    "ws": "*",
+    "yargs": "^17.6.2"
   },
   "devDependencies": {
     "@babel/core": "^7.18.9",

@@ -16,6 +16,17 @@ const DEFAULT_CONNECTION = {
   relay: null,
 };
 
+function testClientIdentityId(_id){
+  return (client)=>{
+    if(client.connection.isAlive() && client.identity){
+      if(client.identity && client.identity._id){
+        return client.identity._id.toString() === _id.toString();
+      }
+    }
+    return false;
+  };
+}
+
 class notWSServer extends EventEmitter{
 
   /**
@@ -332,14 +343,7 @@ class notWSServer extends EventEmitter{
   */
   getClient({test, _id}){
     if(!Func.isFunc(test) && _id){
-      test = (client)=>{
-        if(client.identity){
-          if(client.identity && client.identity._id){
-            return client.identity._id.toString() === _id.toString();
-          }
-        }
-        return false;
-      }
+      test = testClientIdentityId(_id);
     }
     for(let t in this.wsClients){
       if(test(this.wsClients[t])){
@@ -347,6 +351,19 @@ class notWSServer extends EventEmitter{
       }
     }
     return false;
+  }
+
+  /**
+  * filtering clients by specified function and return first passing test
+  * @param {function} test function to test clients and found required
+  * @returns {notWSServerClient}
+  */
+  getClients({test, _id}){
+    if(!Func.isFunc(test) && _id){
+      test = testClientIdentityId(_id);
+    }
+    let results = this.wsClients.filter(test);
+    return results;
   }
 
 }
