@@ -318,7 +318,7 @@ class notWSServer extends EventEmitter{
   * @secure {boolean} secure
   */
   broadcast(type, name, payload, secure = true, connFilter = undefined){
-    this.getClients(connFilter).forEach((client)=>{
+    this.getClientsByFilter(connFilter).forEach((client)=>{
       client.send(type, name, payload, secure);
     });
   }
@@ -328,7 +328,7 @@ class notWSServer extends EventEmitter{
   * @param {function} filter function to filter clients
   * @returns {Array}
   */
-  getClients(filter){
+  getClientsByFilter(filter){
     if(Func.isFunc(filter)){
       return this.wsClients.filter(filter);
     }else{
@@ -362,8 +362,13 @@ class notWSServer extends EventEmitter{
     if(!Func.isFunc(test) && _id){
       test = testClientIdentityId(_id);
     }
-    let results = this.wsClients.filter(test);
-    return results;
+    return this.getClientsByFilter(test);
+  }
+
+  sendToClients({test, _id}, {type, name, message}){
+    this.getClients({test, _id}).forEach((client)=>{
+      client.send(type, name, message).catch((e) => this.logError(e));
+    });
   }
 
 }
