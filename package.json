@@ -1,6 +1,6 @@
 {
   "name": "not-ws",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "description": "not-* family module for WebSocket communication",
   "main": "index.js",
   "scripts": {
@@ -62,7 +62,7 @@
     "jsdoc": "*",
     "mocha": "*",
     "nyc": "*",
-    "rollup": "^3.18.0",
+    "rollup": "^3.19.0",
     "rollup-plugin-filesize": "^10.0.0"
   },
   "nyc": {

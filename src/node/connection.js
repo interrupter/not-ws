@@ -155,8 +155,9 @@ class notWSConnection extends EventEmitter{
   //Подключение к websocket сервису.
   async connect(){
     try{
-      if(!this.jwtToken){
-        throw new Error('No JWT token');
+      if(!this.jwtToken){        
+        this.scheduleReconnect();
+        return;
       }
       if(this.ws && (this.ws.readyState !== WebSocket.CLOSED)){
         this.disconnect();
