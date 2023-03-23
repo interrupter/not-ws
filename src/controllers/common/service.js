@@ -14,7 +14,7 @@ class nsWS {
                 .getWSClient(client)
                 .saveToken(this.app.getWorking("token"));
             this.app.getWSClient(client).disconnect();
-            this.app.getWSClient(client).connect().catch(app.report);
+            this.app.getWSClient(client).connect().catch(this.app.report);
         }
     }
 
