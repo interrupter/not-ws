@@ -1,6 +1,6 @@
 {
   "name": "not-ws",
-  "version": "0.1.24",
+  "version": "0.1.25",
   "description": "not-* family module for WebSocket communication",
   "main": "index.js",
   "scripts": {
@@ -32,7 +32,6 @@
   "dependencies": {
     "deepmerge": "^4.3.1",
     "jsonwebtoken": "*",
-    "not-error": "^0.2.9",
     "url": "*",
     "uuid": "^9.0.0",
     "wolfy87-eventemitter": "*",
@@ -40,6 +39,7 @@
     "yargs": "^17.7.1"
   },
   "devDependencies": {
+    "not-error": "*",
     "@babel/core": "^7.21.3",
     "@babel/eslint-parser": "^7.21.3",
     "@babel/plugin-proposal-decorators": "^7.21.0",

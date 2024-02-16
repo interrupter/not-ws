@@ -743,19 +743,20 @@ var notWSClient = (function () {
 
 	  /**
 	  * Routing action
-	  * @parms {object} messageServiceData  object with fields:
-	                      type - msg type, routes set
-	                      name - action name
-	                      cred - some credentials info
-	    @params {object}  data  payload information from message
-	    @params {object}  client  WS Connection
-	    @returns  {Promise} from targeted action or throwing Error if route doesn't exist
+	  * @parms {object} messageServiceData object with fields:
+	  type - msg type, routes set
+	  name - action name
+	  cred - some credentials info
+	  @params {object} data payload information from message
+	  @params {object} client WS Connection
+	  @returns {Promise} from targeted action or throwing Error if route doesn't exist
 	  */
 	  async route({
 	    type,
 	    name,
 	    cred
 	  }, data, client) {
+	    const identity = client.identity;
 	    if (Func.ObjHas(this.routes, type) && Func.ObjHas(this.routes[type], name)) {
 	      this.logMsg('ip:', client.getIP(), type, name);
 	      if (Array.isArray(this.routes[type][name]) && this.routes[type][name].length > 1) {
@@ -765,18 +766,21 @@ var notWSClient = (function () {
 	        await Promise.all(guards.map(guard => Func.executeFunctionAsAsync(guard, [{
 	          data,
 	          cred,
-	          client
+	          client,
+	          identity
 	        }])));
 	        return Func.executeFunctionAsAsync(actualRoute, [{
 	          data,
 	          cred,
-	          client
+	          client,
+	          identity
 	        }]);
 	      } else if (Func.isFunc(this.routes[type][name])) {
 	        return await Func.executeFunctionAsAsync(this.routes[type][name], [{
 	          data,
 	          cred,
-	          client
+	          client,
+	          identity
 	        }]);
 	      }
 	    }
@@ -785,8 +789,8 @@ var notWSClient = (function () {
 
 	  /**
 	  * Adding routes, chainable
-	  * @params {string}  type  name of type
-	  * @params {object}  routes  hash with name => () => {return new Promise} alike workers
+	  * @params {string} type name of type
+	  * @params {object} routes hash with name => () => {return new Promise} alike workers
 	  * @returns {object} self
 	  */
 	  setRoutesForType(type, routes) {
