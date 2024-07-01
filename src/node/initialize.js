@@ -21,14 +21,14 @@ class initializer {
     static FINAL_CONFIG = {};
 
     static initWSEnvironments() {
-        if (config.get("path:ws")) {
+        if (config.get("wsPath")) {
             try {
-                this.OPTIONS = require(config.get("path:ws"));
+                this.OPTIONS = require(config.get("wsPath"));
             } catch (e) {
                 log.error("wsPath not valid");
             }
         } else {
-            log.log("path to ws options not set");
+            log.log("wsPath (derivating from path:ws) to ws options not set");
         }
 
         if (config.get("modules.ws")) {
