@@ -1,5 +1,5 @@
 const STATE = {
-	//нет подключения
+//нет подключения
 	NOT_CONNECTED: 0,
 	//есть подключение
 	CONNECTED: 1,
@@ -62,14 +62,14 @@ let WS_CLOSURE_REASONS = {
 
 //Возвращает описание причины возникновения ивента закрытия WS-подключения
 function mapWsCloseCodes(event){
-	if(!event) return 'unknown reason';   //Если event не задан, то причина неизвестна.
+	if(!event) return 'unknown reason'; //Если event не задан, то причина неизвестна.
 	if(event.reason) return event.reason; //Если reason уже задан, возвращаем его.
 	//Определяем reason-код и ищем его в WS_CLOSURE_REASONS
 	let code = (typeof event.code !== 'undefined'? event.code.toString(): 'undefined');
 	if (!isNaN(parseInt(event))){
 		code = event;
 	}
-	return Object.prototype.hasOwnProperty.call(WS_CLOSURE_REASONS, code) ? WS_CLOSURE_REASONS[code] : `Unknown reason: ${code}`;
+	return Object.hasOwn(WS_CLOSURE_REASONS, code) ? WS_CLOSURE_REASONS[code] : `Unknown reason: ${code}`;
 }
 
 const SYMBOL_ACTIVITY = Symbol('activity');
@@ -81,8 +81,8 @@ const ERR_MSG = {
 	REQUEST_TIMEOUT: 'Request timeout',
 	MSG_ID_IS_NOT_VALID: 'Message ID is not valid uuidv4',
 	MSG_CREDENTIALS_IS_NOT_VALID: 'Message Credentials is not valid!',
-	MSG_TYPE_IS_NOT_VALID:  'Message Type is not valid!',
-	MSG_NAME_IS_NOT_VALID:  'Message Name is not valid!',
+	MSG_TYPE_IS_NOT_VALID: 'Message Type is not valid!',
+	MSG_NAME_IS_NOT_VALID: 'Message Name is not valid!',
 };
 
 const PING_TIMEOUT = 5000;
@@ -96,10 +96,10 @@ const TOKEN_TTL = 1800;
 const TOKEN_RENEW_TTL = 300;
 
 const MSG_TYPE = {
-	REQUEST:     'request',
-	RESPONSE:   'response',
-	EVENT:       'event',
-	COMMAND:     'command',
+	REQUEST: 'request',
+	RESPONSE: 'response',
+	EVENT: 'event',
+	COMMAND: 'command',
 };
 
 const DEV_ENV = 'development';
@@ -141,4 +141,4 @@ export default {
 	notWSException
 };
 
-
+    

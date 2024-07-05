@@ -3,6 +3,8 @@ const merge = require("deepmerge");
 const log = require("not-log")(module, "not-ws:initializer");
 const config = require("not-config").createReader();
 
+const { Env } = require("not-node");
+
 const Func = require("./func");
 const notWSServer = require("./server");
 const notWSClient = require("./client");
@@ -21,9 +23,9 @@ class initializer {
     static FINAL_CONFIG = {};
 
     static initWSEnvironments() {
-        if (config.get("wsPath")) {
+        if (Env.get("wsPath")) {
             try {
-                this.OPTIONS = require(config.get("wsPath"));
+                this.OPTIONS = require(Env.get("wsPath"));
             } catch (e) {
                 log.error("wsPath not valid");
             }
@@ -34,6 +36,7 @@ class initializer {
         if (config.get("modules.ws")) {
             this.CONFIG = config.get("modules.ws");
         }
+
         //final config
         this.FINAL_CONFIG = merge(this.OPTIONS, this.CONFIG);
     }

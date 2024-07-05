@@ -560,7 +560,7 @@ var notWSClient = (function () {
 	  if (!isNaN(parseInt(event))) {
 	    code = event;
 	  }
-	  return Object.prototype.hasOwnProperty.call(WS_CLOSURE_REASONS, code) ? WS_CLOSURE_REASONS[code] : `Unknown reason: ${code}`;
+	  return Object.hasOwn(WS_CLOSURE_REASONS, code) ? WS_CLOSURE_REASONS[code] : `Unknown reason: ${code}`;
 	}
 	const SYMBOL_ACTIVITY$1 = Symbol('activity');
 	const SYMBOL_STATE$1 = Symbol('state');
@@ -627,20 +627,20 @@ var notWSClient = (function () {
 	}
 
 	/**
-	 * Returns true if argument is Async function
-	 * @param {function} func  to test
-	 * @return {boolean}       if this function is constructed as AsyncFunction
-	 **/
+	* Returns true if argument is Async function
+	* @param {function} func to test
+	* @return {boolean} if this function is constructed as AsyncFunction
+	**/
 	function isAsync(func) {
 	  return func.constructor.name === "AsyncFunction";
 	}
 
 	/**
-	 *  Executes method in appropriate way inside Promise
-	 * @param {function}   proc    function to execute
-	 * @param {Array}     params  array of params
-	 * @return {Promise}          results of method execution
-	 **/
+	* Executes method in appropriate way inside Promise
+	* @param {function} proc function to execute
+	* @param {Array} params array of params
+	* @return {Promise} results of method execution
+	**/
 	async function executeFunctionAsAsync(proc, params) {
 	  if (isFunc(proc)) {
 	    if (isAsync(proc)) {
@@ -656,7 +656,7 @@ var notWSClient = (function () {
 	  this._alive = true;
 	}
 	function ObjHas(obj, prop) {
-	  return Object.prototype.hasOwnProperty.call(obj, prop);
+	  return Object.hasOwn(obj, prop);
 	}
 
 	//Проверка строки на JSON(со stackoverflow).

@@ -39,7 +39,7 @@ class nsWS {
                 "logger",
                 "debug",
             ]) {
-                if (Object.prototype.hasOwnProperty.call(opts, optName)) {
+                if (Object.hasOwn(opts, optName)) {
                     options[optName] = opts[optName];
                 }
             }
@@ -49,9 +49,7 @@ class nsWS {
                 false
             );
             if (optionsFromAppConfig) {
-                if (
-                    !Object.prototype.hasOwnProperty.call(options, "connection")
-                ) {
+                if (!Object.hasOwn(options, "connection")) {
                     options.connection = {};
                 }
                 options.connection = Object.assign(options.connection, {
