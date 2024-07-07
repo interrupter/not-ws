@@ -66,8 +66,8 @@ class notWSServer extends EventEmitter{
     this.connection = Object.assign({}, DEFAULT_CONNECTION, connection);
 
     this.logMsg = logger?logger.log:()=>{};
-		this.logDebug = logger?logger.debug:()=>{};
-		this.logError = logger?logger.error:()=>{};
+	this.logDebug = logger?logger.debug:()=>{};
+	this.logError = logger?logger.error:()=>{};
 
     this.routes = routes;
     this.messenger = messenger;
@@ -142,13 +142,13 @@ class notWSServer extends EventEmitter{
     let token = url.parse(req.url, true).query.token;
     //Проверяем токен
     try {
-      this.logMsg('token', token);
       jwt.verify(token, this.jwt.key);
       return false;
     } catch(err) {
-      this.logDebug(err);
       if(err.name === 'TokenExpiredError'){
-        this.logError('Client must update token');
+        this.logDebug('Client must update token');
+      }else{
+        this.logDebug(err);
       }
       return true;
     }
