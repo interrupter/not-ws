@@ -247,12 +247,12 @@ class notWSConnection extends EventEmitter{
 			this.countPassed(input, 'in');
 			//проверяем не "понг" ли это, если так - выходим
       
-			let rawMsg = input.data;
+			const rawMsg = input.data;
       
 			if(this.checkPingMsg(rawMsg)){
 				return;
 			}
-			let data = Func.tryParseJSON(rawMsg);
+			const data = Func.tryParseJSON(rawMsg);
 			//Не удалось распарсить ответ от сервера как JSON
 			if(!data){
 				this.emit('messageInWrongFormat', rawMsg);
@@ -441,20 +441,28 @@ class notWSConnection extends EventEmitter{
 
 	/**
   * If message is plain text 'pong', then it sets connections as isAlive
-  * @params {string}  msg   incoming message
+  * @params {string}  input   incoming message
   * @returns {boolean}  if it 'pong' message
   **/
-	checkPingMsg(msg){
-		if (msg === 'ping'){
-			this.setAlive();
-			this.emit('pinged');
-			this.pong();
-			return true;
+	checkPingMsg(input){
+		let msg = input;
+		if(typeof input !== 'string'){
+			if(input.toString && input.length === 4){
+				msg = input.toString();
+			}
 		}
-		if (msg === 'pong'){
-			this.setAlive();
-			this.emit('ponged');
-			return true;
+		if(msg.length === 4){
+			if (msg === 'ping'){
+				this.setAlive();
+				this.emit('pinged');
+				this.pong();
+				return true;
+			}
+			if (msg === 'pong'){
+				this.setAlive();
+				this.emit('ponged');
+				return true;
+			}
 		}
 		return false;
 	}
@@ -463,7 +471,7 @@ class notWSConnection extends EventEmitter{
 
 	/**
   * Отправка сообщения
-  * @param  {object|string} данные в виде
+  * @param  {object|string} data  данные в виде
   *                         - строки, будут обернуты в соотвествии со спецификацией
   *                         - объекта, будут переданы без изменений
   * @return {Promise} resolve - удачно, reject - сбой
